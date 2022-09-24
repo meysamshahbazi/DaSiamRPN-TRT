@@ -184,4 +184,17 @@ def SiamRPN_track(state, im):
     state['target_pos'] = target_pos
     state['target_sz'] = target_sz
     state['score'] = score
+
+    # add some
+    # avg_chans = np.mean(im, axis=(0, 1))
+
+    # wc_z = target_sz[0] + p.context_amount * sum(target_sz)
+    # hc_z = target_sz[1] + p.context_amount * sum(target_sz)
+    # s_z = round(np.sqrt(wc_z * hc_z)) 
+    # z_crop = get_subwindow_tracking(im, target_pos, p.exemplar_size, s_z, avg_chans)
+
+    # z = Variable(z_crop.unsqueeze(0))
+    # net.temple(z.cuda())
+
+
     return state

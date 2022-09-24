@@ -30,7 +30,23 @@ using namespace cv;
 class DaSiam
 {
 private:
-
+    // most of const variable are tracker configuration and the must be intialized corectly
+    const int exemplar_size = 127; // input z size
+    const int instance_size = 271; // input x size (search region)
+    const int total_stride = 8;
+    const int score_size = (instance_size-exemplar_size)/total_stride+1;
+    const float context_amount = 0.5; // context amount for the exemplar
+    const bool adaptive = true; 
+    const float penalty_k = 0.055;
+    const float window_influence = 0.42;
+    const float lr = 0.295;
+    // end of config -----------------------------------------------------------------
+    Point2f target_pos;
+    Size2f target_sz;
+    
+    int im_h;
+    int im_w;
+    
 public:
     DaSiam();
     ~DaSiam();

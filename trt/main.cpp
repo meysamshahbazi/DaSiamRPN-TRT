@@ -16,9 +16,9 @@ int main(int argc, const char ** argv)
 
     // get bounding box
     cap >> frame;
-    stmtracker st;
-    st.init(frame,roi);
-    rectangle( frame, roi, Scalar( 255, 0, 0 ), 2, 1 );
+    DaSiam ds;
+    ds.init(frame,roi);
+    rectangle(frame, roi, Scalar( 255, 0, 0 ), 2, 1 );
     imshow("tracker",frame);
     // waitKey(0);
     int64 tick_counter = 0;
@@ -32,7 +32,7 @@ int main(int argc, const char ** argv)
             break;
         frame_idx ++;
         int64 t1 = cv::getTickCount();
-        roi = st.update(frame);
+        roi = ds.update(frame);
         int64 t2 = cv::getTickCount();
         tick_counter += t2 - t1;
         // std::cout<<roi.x<<" "<<roi.y<<" "<<roi.width<<" "<<roi.height<<endl;
