@@ -1,1 +1,2 @@
 *.model
+code/__pycache__/
