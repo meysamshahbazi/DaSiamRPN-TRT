@@ -14,22 +14,16 @@
 #include <opencv2/cudaarithm.hpp>
 #include <algorithm>
 #include <numeric>
-
 #include <iostream>
 #include <fstream>
 #include <string>
 #include "calibrator.hpp"
 #include <opencv2/imgproc.hpp>
-
-using namespace cv;
-
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
-
-// #include <opencv2/core/cuda_stream_accessor.hpp>
+using namespace cv;
 using namespace std;
-
 
 struct  TRTDestroy
 {
@@ -76,8 +70,6 @@ void parseEngineModel(  const string &engine_file_path,
                         
 void saveEngineFile(const string &onnx_path,
                     const string &engine_path);
-
-void serializeOnnx2engine(std::unique_ptr<nvinfer1::ICudaEngine, TRTDestroy> &engine,const string &model_path);
 
 Mat get_hann_win(Size sz);
 

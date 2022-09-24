@@ -20,17 +20,6 @@ Mat get_hann_win(Size sz)
     return hann_rows * hann_cols;
 }
 
-
-// class Logger : public nvinfer1::ILogger
-// {
-// void log(Severity severity, const char* msg) noexcept override
-// {
-//     // suppress info-level messages
-//     if (severity <= Severity::kWARNING)
-//         std::cout << msg << std::endl;
-// }
-// };// logger;
-
 // calculate size of tensor
 size_t getSizeByDim(const nvinfer1::Dims& dims)
 {
@@ -327,25 +316,7 @@ void parseEngineModel(const string & engine_file_path,
     return;
 }     
 
-void serializeOnnx2engine(std::unique_ptr<nvinfer1::ICudaEngine, TRTDestroy> &engine,const string & model_path )
-{
-    // this function have bug and crashed during run ...
-    cout<<"||||||||||||||||||||||||||||||||||||||"<<endl;
-    nvinfer1::IHostMemory* modelStream = engine->serialize();
-    cout<<"||||||||||||||||||||||||||||||||||||||"<<endl;
-    assert(modelStream != nullptr);
 
-    std::ofstream p("head.engine", std::ios::binary);
-    if (!p)
-    {
-        std::cerr << "could not open plan output file" << std::endl;
-        return;
-    }
-    p.write(reinterpret_cast<const char*>(modelStream->data()), modelStream->size());
-    delete modelStream;
-
-    return;
-}
 
 void postprocessResults(float * gpu_output,const nvinfer1::Dims &dims, int batch_size, std::string file_name)
 {
