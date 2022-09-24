@@ -9,13 +9,13 @@ import glob, cv2, torch
 import numpy as np
 from os.path import realpath, dirname, join
 
-from net import SiamRPNvot,SiamRPNBIG
+from net import SiamRPNvot,SiamRPNBIG,SiamRPNotb
 from run_SiamRPN import SiamRPN_init, SiamRPN_track
 from utils import get_axis_aligned_bbox, cxy_wh_2_rect
 
 # load net
-net = SiamRPNBIG()
-net.load_state_dict(torch.load('SiamRPNBIG.model'))
+net = SiamRPNotb()
+net.load_state_dict(torch.load('SiamRPNOTB.model'))
 net.eval().cuda()
 
 # # image and init box

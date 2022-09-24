@@ -62,14 +62,15 @@ class SiamRPN(nn.Module):
 
 class SiamRPNBIG(SiamRPN):
     def __init__(self):
-        super(SiamRPNBIG, self).__init__(size=2)
+        super(SiamRPNBIG, self).__init__(size=2) 
+        # self.cfg = {'lr':0.295, 'window_influence': 0.42, 'penalty_k': 0.055, 'instance_size': 271, 'adaptive': True} # 0.383
         self.cfg = {'lr':0.295, 'window_influence': 0.42, 'penalty_k': 0.055, 'instance_size': 271, 'adaptive': True} # 0.383
 
 
 class SiamRPNvot(SiamRPN):
     def __init__(self):
         super(SiamRPNvot, self).__init__(size=1, feature_out=256)
-        self.cfg = {'lr':0.45, 'window_influence': 0.44, 'penalty_k': 0.04, 'instance_size': 271, 'adaptive': False} # 0.355
+        self.cfg = {'lr':0.45, 'window_influence': 0.44, 'penalty_k': 0.04, 'instance_size': 271, 'adaptive': True} # 0.355
 
 
 class SiamRPNotb(SiamRPN):
