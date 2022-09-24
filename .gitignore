@@ -1,3 +1,4 @@
 *.model
 code/__pycache__/
-.vscode/
+.vscode/*
+trt/build/*
