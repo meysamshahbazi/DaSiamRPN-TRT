@@ -17,7 +17,6 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include "calibrator.hpp"
 #include <opencv2/imgproc.hpp>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -57,12 +56,6 @@ void parseOnnxModel(    const string &model_path,
                         size_t pool_size,
                         unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> &engine,
                         unique_ptr<nvinfer1::IExecutionContext,TRTDestroy> &context);
-
-void parseOnnxModelINT8(    const string &model_path,
-                            size_t pool_size,
-                            calibration_model cal_type,
-                            unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> &engine,
-                            unique_ptr<nvinfer1::IExecutionContext,TRTDestroy> &context);
 
 void parseEngineModel(  const string &engine_file_path,
                         unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> &engine,
