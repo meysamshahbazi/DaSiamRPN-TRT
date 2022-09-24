@@ -2,3 +2,4 @@
 code/__pycache__/
 .vscode/*
 trt/build/*
+.ipynb_checkpoints/*

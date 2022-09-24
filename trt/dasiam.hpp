@@ -34,6 +34,7 @@ private:
     const int exemplar_size = 127; // input z size
     const int instance_size = 271; // input x size (search region)
     const int total_stride = 8;
+
     const int score_size = (instance_size-exemplar_size)/total_stride+1;
     const float context_amount = 0.5; // context amount for the exemplar
     const bool adaptive = true; 
@@ -46,7 +47,11 @@ private:
     
     int im_h;
     int im_w;
-    
+
+    Mat window;
+    Scalar avg_chans;// this has 4 value and the order is not the same as in python
+
+
 public:
     DaSiam();
     ~DaSiam();
