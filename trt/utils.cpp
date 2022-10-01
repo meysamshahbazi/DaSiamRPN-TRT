@@ -84,7 +84,6 @@ void get_crop_single(Mat & im,Point2f target_pos_,
     }
 
     float sz = sample_sz/df;
-    
     int szl = std::max(static_cast<int>(std::round(sz)) ,2);
 
     Point2i tl = Point2i(posl.x-(szl-1)/2,posl.y-(szl-1)/2);
@@ -112,6 +111,57 @@ void get_crop_single(Mat & im,Point2f target_pos_,
     ); 	
 
     real_scale = static_cast<float>(output_sz)/((br.x-tl.x+1)*df) ;   
+}
+void get_subwindow_tracking(const Mat &im, Point pos,int model_sz,int original_sz,Scalar avg_chans,Mat &im_patch)
+{
+    int sz = original_sz;
+    Size im_sz = im.size();
+    int cc = (original_sz+1) /2;
+    int context_xmin = pos.x - cc;
+    int context_xmax = context_xmin + sz -1;
+    int context_ymin = pos.y - cc;
+    int context_ymax = context_ymin + sz -1;
+    int left_pad = std::max(0,-context_xmin);
+    int top_pad = std::max(0,-context_ymin);
+    int right_pad = max(0, context_xmax - im_sz.width + 1);
+    int bottom_pad = max(0, context_ymax - im_sz.height + 1);
+
+    context_xmin = context_xmin + left_pad;
+    context_xmax = context_xmax + left_pad;
+    context_ymin = context_ymin + top_pad;
+    context_ymax = context_ymax + top_pad;
+    int r = im.rows;
+    int c = im.cols;
+    Mat im_patch_original;
+    if(top_pad || bottom_pad || right_pad || left_pad)
+    {
+        Mat te_im = Mat(r+top_pad+bottom_pad, c+left_pad+right_pad, CV_8UC3);
+        im.copyTo(te_im(Rect(0,0,c,r)));
+
+        if(top_pad) // te_im[0:top_pad, left_pad:left_pad + c, :] = avg_chans
+            te_im(Rect(left_pad, 0, c, top_pad)) = avg_chans;
+        if(bottom_pad) // te_im[r + top_pad:, left_pad:left_pad + c, :] = avg_chans
+            te_im(Rect(left_pad, r+top_pad,c , bottom_pad)) = avg_chans;
+        if(left_pad) // te_im[:, 0:left_pad, :] = avg_chans
+            te_im(Rect(0, 0,left_pad , r+top_pad+bottom_pad)) = avg_chans;
+        if(right_pad) // te_im[:, c + left_pad:, :] = avg_chans
+            te_im(Rect(c+left_pad,0,right_pad,r+top_pad+bottom_pad)) = avg_chans;
+
+        Rect roi = Rect(context_xmin,context_ymin,context_xmax-context_xmin,context_ymax-context_ymin);
+        im_patch_original = te_im(roi);
+    }       
+    else
+    {
+        Rect roi = Rect(context_xmin,context_ymin,context_xmax-context_xmin,context_ymax-context_ymin);
+        im_patch_original = im(roi);
+    }
+
+    if(model_sz != original_sz)
+        cv::resize(im_patch_original,im_patch,cv::Size(model_sz,model_sz));
+    else 
+        im_patch = im_patch_original;
+        
+    return;    
 }
 
 void parseOnnxModel(const string & onnx_path,

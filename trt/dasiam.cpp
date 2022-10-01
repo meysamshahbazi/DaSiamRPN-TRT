@@ -31,7 +31,7 @@ void DaSiam::init(const Mat &im, const Rect2f state)
     int s_z = std::round<int>(std::sqrt(wc_z*hc_z));
 
     Mat z_crop;
-    
+    get_subwindow_tracking(im,target_pos,exemplar_size,s_z,avg_chans,z_crop);
     return;
 }
 

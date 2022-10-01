@@ -8,6 +8,7 @@
 #include <vector>
 #include <cuda_runtime_api.h>
 #include <opencv2/imgcodecs.hpp>
+#include <opencv2/highgui.hpp>
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/cudawarping.hpp>
 #include <opencv2/core.hpp>
@@ -39,6 +40,8 @@ void get_crop_single(Mat & im,Point2f target_pos_,
                                 float target_scale,int output_sz,Scalar avg_chans,
                                 Mat &im_patch,float &real_scale); // these are output 
 
+
+void get_subwindow_tracking(const Mat &im, Point pos,int model_sz,int original_sz,Scalar avg_chans,Mat &z_crop);
 class Logger : public nvinfer1::ILogger
 {
 void log(Severity severity, const char* msg) noexcept override
