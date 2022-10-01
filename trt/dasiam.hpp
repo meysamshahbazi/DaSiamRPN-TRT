@@ -41,10 +41,24 @@ private:
     const float penalty_k = 0.055;
     const float window_influence = 0.42;
     const float lr = 0.295;
+    const string  temple_path{"../../temple.onnx"};
+    const string  siam_path{"../../SiamRPNOTB.onnx"};
+
     // end of config -----------------------------------------------------------------
     Point2f target_pos;
     Size2f target_sz;
-    
+    unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> engine_temple{nullptr};
+    unique_ptr<nvinfer1::IExecutionContext,TRTDestroy> context_temple{nullptr};
+    vector<void *> buffers_temple;
+    vector<nvinfer1::Dims> input_dims_temple;
+    vector<nvinfer1::Dims> output_dims_temple;
+
+    unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> engine_siam{nullptr};
+    unique_ptr<nvinfer1::IExecutionContext,TRTDestroy> context_siam{nullptr};
+    vector<void *> buffers_siam;
+    vector<nvinfer1::Dims> input_dims_siam;
+    vector<nvinfer1::Dims> output_dims_siam;
+
     int im_h;
     int im_w;
 
