@@ -15,6 +15,7 @@ DaSiam::DaSiam()
 #ifdef LOAD_FROM_ONNX
     parseOnnxModel(temple_path,1U<<24,engine_temple,context_temple);
     parseOnnxModel(siam_path,1U<<24,engine_siam,context_siam);
+    parseOnnxModel(regress_path,1U<<24,engine_regress,context_regress);
 #endif
 #ifdef LOAD_FROM_ENGINE
     parseEngineModel(temple_path_engine,engine_temple,context_temple);
@@ -57,6 +58,26 @@ DaSiam::DaSiam()
             output_dims_siam.emplace_back(engine_siam->getBindingDimensions(i));
         }
     }
+
+    buffers_regress.reserve(engine_regress->getNbBindings());
+    cout<<"------------------------------"<<endl;
+    for (size_t i = 0; i < engine_regress->getNbBindings(); ++i)
+    {
+        auto binding_size = getSizeByDim(engine_regress->getBindingDimensions(i)) * 1 * sizeof(float);
+        cudaMalloc(&buffers_regress[i], binding_size);
+        std::cout<<engine_regress->getBindingName(i);//"|" <<engine_regress->getBindingDimensions(i)<<std::endl;
+        printDim(engine_regress->getBindingDimensions(i));
+        if (engine_regress->bindingIsInput(i))
+        {  
+            input_dims_regress.emplace_back(engine_regress->getBindingDimensions(i));
+        }
+        else
+        {
+            output_dims_regress.emplace_back(engine_regress->getBindingDimensions(i));
+        }
+    }
+
+
 
     size_t binding_size;
     buffers_r1.reserve(2);
@@ -165,6 +186,8 @@ Rect2f DaSiam::update(const Mat &im)
     buffers_cls[0] = buffers_siam[2]; // score
     context_r1->enqueueV2(buffers_r1.data(), 0, nullptr);
     context_cls->enqueueV2(buffers_cls.data(), 0, nullptr); // TODO do it with cuDNN
+    buffers_regress[0] = buffers_r1[1];
+    context_regress->enqueueV2(buffers_regress.data(), 0, nullptr);
     // these are for F.conv...  
     
 

@@ -43,8 +43,11 @@ private:
     const float lr = 0.295;
     const string  temple_path{"../../temple.onnx"};
     const string  siam_path{"../../SiamRPNOTB.onnx"};
+    const string  regress_path{"../../RegressAdjust.onnx"};
+
     const string  temple_path_engine{"../../temple.engine"};
     const string  siam_path_engine{"../../SiamRPNOTB.engine"};
+    const string  regress_path_engine{"../../RegressAdjust.engine"};
 
     Logger logger;
 
@@ -74,6 +77,13 @@ private:
     vector<void *> buffers_cls;
     vector<nvinfer1::Dims> input_dims_cls;
     vector<nvinfer1::Dims> output_dims_cls;
+
+    unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> engine_regress{nullptr};
+    unique_ptr<nvinfer1::IExecutionContext,TRTDestroy> context_regress{nullptr};
+    vector<void *> buffers_regress;
+    vector<nvinfer1::Dims> input_dims_regress;
+    vector<nvinfer1::Dims> output_dims_regress;
+
     int im_h;
     int im_w;
 
