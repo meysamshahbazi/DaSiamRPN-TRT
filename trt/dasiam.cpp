@@ -188,6 +188,9 @@ Rect2f DaSiam::update(const Mat &im)
     context_cls->enqueueV2(buffers_cls.data(), 0, nullptr); // TODO do it with cuDNN
     buffers_regress[0] = buffers_r1[1];
     context_regress->enqueueV2(buffers_regress.data(), 0, nullptr);
+    // now buffers_regress[1] contain delta
+    // buffers_cls[1] contain score
+
     // these are for F.conv...  
     
 
@@ -202,37 +205,21 @@ void DaSiam::create_fconv_r(unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> &engine
     unique_ptr<nvinfer1::IBuilder,TRTDestroy> builder{nvinfer1::createInferBuilder(logger)};
     unique_ptr<nvinfer1::IBuilderConfig,TRTDestroy> config{builder->createBuilderConfig()};
     uint32_t flag = 1U <<static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
-    // nvinfer1::INetworkDefinition* network = builder->createNetworkV2(flag);
     unique_ptr<nvinfer1::INetworkDefinition,TRTDestroy> network{builder->createNetworkV2(flag)};
     nvinfer1::ITensor* data = network->addInput("delta", nvinfer1::DataType::kFLOAT, nvinfer1::Dims4{1,256, 22, 22});
-    // unique_ptr<nvinfer1::ITensor,TRTDestroy> data{network->addInput("delta", nvinfer1::DataType::kFLOAT, nvinfer1::Dims3{256, 22, 22})};
     size_t kernel_size = 20*256*4*4;
     float *kernel_r_wt = new float[kernel_size];
-    // cudaMalloc(&kernel_r_wt,20*256*4*4*sizeof(float));
     cudaMemcpy(kernel_r_wt,buffers_temple[1],kernel_size*sizeof(float),cudaMemcpyDeviceToHost);
     nvinfer1::Weights wt{nvinfer1::DataType::kFLOAT,(void*)kernel_r_wt, kernel_size};
-
     nvinfer1::IConvolutionLayer* conv1 = network->addConvolutionNd(*data, 20, nvinfer1::DimsHW{4, 4}, wt, nvinfer1::Weights{});
-    
-    // unique_ptr<nvinfer1::IConvolutionLayer,TRTDestroy> conv1{network->addConvolutionNd(*data, 20, nvinfer1::DimsHW{4, 4}, wt, nvinfer1::Weights{})};
     conv1->setStrideNd(nvinfer1::DimsHW{1, 1});
-    
     conv1->getOutput(0)->setName("fconv_r1_kernel");
-    
     network->markOutput(*conv1->getOutput(0));
-    
-    // builder->setMaxBatchSize(1);
-    // config->setMaxWorkspaceSize();
     config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE,1 << 30);
     config->setFlag(nvinfer1::BuilderFlag::kFP16);
-    
-    // nvinfer1::ICudaEngine* engine = builder->buildEngineWithConfig(*network, *config);
-    // engine.reset(builder->buildEngineWithConfig(*network, *config));
     unique_ptr<nvinfer1::IHostMemory,TRTDestroy> serializedModel{builder->buildSerializedNetwork(*network, *config)};
-    // cout<<"conv1: "<<conv1<<endl;
     nvinfer1::IRuntime* runtime = nvinfer1::createInferRuntime(logger);
     engine.reset(runtime->deserializeCudaEngine( serializedModel->data(), serializedModel->size()) );
-
     context.reset(engine->createExecutionContext());
 }
 
@@ -244,28 +231,19 @@ void DaSiam::create_fconv_cls(unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> &engi
     uint32_t flag = 1U <<static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
     unique_ptr<nvinfer1::INetworkDefinition,TRTDestroy> network{builder->createNetworkV2(flag)};
     nvinfer1::ITensor* data = network->addInput("score", nvinfer1::DataType::kFLOAT, nvinfer1::Dims4{1,256, 22, 22});
-
     size_t kernel_size = 10*256*4*4;
     float *kernel_cls_wt = new float[kernel_size];
     // cudaMalloc(&kernel_r_wt,20*256*4*4*sizeof(float));
     cudaMemcpy(kernel_cls_wt,buffers_temple[2],kernel_size*sizeof(float),cudaMemcpyDeviceToHost);
     nvinfer1::Weights wt{nvinfer1::DataType::kFLOAT,(void*)kernel_cls_wt, kernel_size};
-
     nvinfer1::IConvolutionLayer* conv1 = network->addConvolutionNd(*data, 10, nvinfer1::DimsHW{4, 4}, wt, nvinfer1::Weights{});
-    
     conv1->setStrideNd(nvinfer1::DimsHW{1, 1});
-    
     conv1->getOutput(0)->setName("fconv_cls_kernel");
-    
     network->markOutput(*conv1->getOutput(0));
-
     config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE,1 << 30);
     config->setFlag(nvinfer1::BuilderFlag::kFP16);
-
     unique_ptr<nvinfer1::IHostMemory,TRTDestroy> serializedModel{builder->buildSerializedNetwork(*network, *config)};
-
     nvinfer1::IRuntime* runtime = nvinfer1::createInferRuntime(logger);
     engine.reset(runtime->deserializeCudaEngine( serializedModel->data(), serializedModel->size()) );
-
     context.reset(engine->createExecutionContext());
 }
