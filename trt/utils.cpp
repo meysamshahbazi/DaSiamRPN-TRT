@@ -31,6 +31,15 @@ size_t getSizeByDim(const nvinfer1::Dims& dims)
     return size;
 }
 
+void printDim(const nvinfer1::Dims& dims)
+{
+    cout<<"[";
+    for (size_t i = 0; i < dims.nbDims; ++i)
+    {
+        cout<<dims.d[i]<<", ";
+    }
+    cout<<" ]\n";
+}
 void get_crop_single(Mat & im,Point2f target_pos_,
                                 float target_scale,int output_sz,Scalar avg_chans,
                                 Mat &im_patch,float &real_scale) // these are output 
@@ -135,14 +144,14 @@ void get_subwindow_tracking(const Mat &im, Point pos,int model_sz,int original_s
     Mat im_patch_original;
     if(top_pad || bottom_pad || right_pad || left_pad)
     {
-        Mat te_im = Mat(r+top_pad+bottom_pad, c+left_pad+right_pad, CV_8UC3);
+        Mat te_im = Mat(r+top_pad+bottom_pad, c+left_pad+right_pad, CV_8UC3,avg_chans);
         im.copyTo(te_im(Rect(0,0,c,r)));
 
         if(top_pad) // te_im[0:top_pad, left_pad:left_pad + c, :] = avg_chans
             te_im(Rect(left_pad, 0, c, top_pad)) = avg_chans;
         if(bottom_pad) // te_im[r + top_pad:, left_pad:left_pad + c, :] = avg_chans
             te_im(Rect(left_pad, r+top_pad,c , bottom_pad)) = avg_chans;
-        if(left_pad) // te_im[:, 0:left_pad, :] = avg_chans
+        if(left_pad) // te_im[0:, 0:left_pad, :] = avg_chans
             te_im(Rect(0, 0,left_pad , r+top_pad+bottom_pad)) = avg_chans;
         if(right_pad) // te_im[:, c + left_pad:, :] = avg_chans
             te_im(Rect(c+left_pad,0,right_pad,r+top_pad+bottom_pad)) = avg_chans;
@@ -242,7 +251,7 @@ void saveEngineFile(const string & onnx_path,
     // lets create config file for engine 
     unique_ptr<nvinfer1::IBuilderConfig,TRTDestroy> config{builder->createBuilderConfig()};
 
-    config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE,1U<<24);
+    config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE,1U<<30);
     // config->setMaxWorkspaceSize(1U<<30);
 
     // use fp16 if it is possible 
@@ -252,7 +261,7 @@ void saveEngineFile(const string & onnx_path,
         config->setFlag(nvinfer1::BuilderFlag::kFP16);
     }
     // setm max bach size as it is very importannt for trt
-    // builder->setMaxBatchSize(1);
+    builder->setMaxBatchSize(1);
     // create engine and excution context
     unique_ptr<nvinfer1::IHostMemory,TRTDestroy> serializedModel{builder->buildSerializedNetwork(*network, *config)};
 

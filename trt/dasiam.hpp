@@ -43,6 +43,10 @@ private:
     const float lr = 0.295;
     const string  temple_path{"../../temple.onnx"};
     const string  siam_path{"../../SiamRPNOTB.onnx"};
+    const string  temple_path_engine{"../../temple.engine"};
+    const string  siam_path_engine{"../../SiamRPNOTB.engine"};
+
+    Logger logger;
 
     // end of config -----------------------------------------------------------------
     Point2f target_pos;
@@ -59,12 +63,28 @@ private:
     vector<nvinfer1::Dims> input_dims_siam;
     vector<nvinfer1::Dims> output_dims_siam;
 
+    unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> engine_r1{nullptr};
+    unique_ptr<nvinfer1::IExecutionContext,TRTDestroy> context_r1{nullptr};
+    vector<void *> buffers_r1;
+    vector<nvinfer1::Dims> input_dims_r1;
+    vector<nvinfer1::Dims> output_dims_r1;
+
+    unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> engine_cls{nullptr};
+    unique_ptr<nvinfer1::IExecutionContext,TRTDestroy> context_cls{nullptr};
+    vector<void *> buffers_cls;
+    vector<nvinfer1::Dims> input_dims_cls;
+    vector<nvinfer1::Dims> output_dims_cls;
     int im_h;
     int im_w;
 
     Mat window;
     Scalar avg_chans;// this has 4 value and the order is not the same as in python
 
+    void create_fconv_r(unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> &engine,
+                    unique_ptr<nvinfer1::IExecutionContext,TRTDestroy> &context);
+            
+    void create_fconv_cls(unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> &engine,
+                    unique_ptr<nvinfer1::IExecutionContext,TRTDestroy> &context);
 
 public:
     DaSiam();

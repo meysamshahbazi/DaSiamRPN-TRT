@@ -4,3 +4,4 @@ code/__pycache__/
 trt/build/*
 .ipynb_checkpoints/*
 *.onnx
+*.engine

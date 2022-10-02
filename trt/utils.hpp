@@ -36,6 +36,8 @@ struct  TRTDestroy
     }
 };
 
+void printDim(const nvinfer1::Dims& dims);
+
 void get_crop_single(Mat & im,Point2f target_pos_,
                                 float target_scale,int output_sz,Scalar avg_chans,
                                 Mat &im_patch,float &real_scale); // these are output 
@@ -47,8 +49,9 @@ class Logger : public nvinfer1::ILogger
 void log(Severity severity, const char* msg) noexcept override
 {
     // suppress info-level messages
-    if (severity <= Severity::kWARNING)
-        std::cout << msg << std::endl;
+    // if (severity <= Severity::kWARNING)
+    //     std::cout << msg << std::endl;
+    return;
 }
 };// logger;
 
