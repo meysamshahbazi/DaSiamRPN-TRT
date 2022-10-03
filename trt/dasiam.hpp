@@ -41,7 +41,7 @@ private:
     const bool adaptive = true; 
     const float penalty_k = 0.055;
     const float window_influence = 0.42;
-    const float lr = 0.295;
+    const float p_lr = 0.295;
     const string  temple_path{"../../temple.onnx"};
     const string  siam_path{"../../SiamRPNOTB.onnx"};
     const string  regress_path{"../../RegressAdjust.onnx"};
@@ -94,11 +94,19 @@ private:
     std::vector<float > ratios ={0.33, 0.5, 1, 2, 3};
     std::vector< vector<float> >anchor;
     
+    std::vector<float> pscore;
+    std::vector<float> penalty;
+
     void create_fconv_r(unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> &engine,
                     unique_ptr<nvinfer1::IExecutionContext,TRTDestroy> &context);
             
     void create_fconv_cls(unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> &engine,
                     unique_ptr<nvinfer1::IExecutionContext,TRTDestroy> &context);
+
+    float change(float r);
+    float sz(float w,float h);
+
+
 
 public:
     DaSiam();

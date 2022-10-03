@@ -51,9 +51,9 @@ int main(int argc, const char ** argv)
         // Rect roi_int = 
         cout << "FPS: " << ((double)(frame_idx)) / (static_cast<double>(tick_counter) / cv::getTickFrequency()) << endl;
         rectangle( frame, roi, Scalar( 255, 0, 0 ), 2, 1 );
-        imshow("tracker",frame);
+        // imshow("tracker",frame);
         
-        if(waitKey(1)==27) break;
+        // if(waitKey(1)==27) break;
     }    
 
     return 0;
