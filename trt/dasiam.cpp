@@ -191,6 +191,14 @@ Rect2f DaSiam::update(const Mat &im)
     context_cls->enqueueV2(buffers_cls.data(), 0, nullptr); // TODO do it with cuDNN
     buffers_regress[0] = buffers_r1[1];
     context_regress->enqueueV2(buffers_regress.data(), 0, nullptr);
+    int delta_size = anchor.size()*4;
+    float* delta = new float[delta_size];
+    float* score = new float[10*score_size*score_size];
+
+    cudaMemcpyAsync(delta, buffers_regress[1], delta_size*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaMemcpyAsync(score, buffers_cls[1], 10*score_size*score_size*sizeof(float), cudaMemcpyDeviceToHost);
+
+    
     // now buffers_regress[1] contain delta
     // buffers_cls[1] contain score
 
