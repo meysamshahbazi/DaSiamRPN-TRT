@@ -8,6 +8,12 @@ using namespace cv;
 int main(int argc, const char ** argv) 
 {
     // set input video
+
+// anchor = generate_anchor(total_stride=8, scales= [8, ], 
+//                          ratios = [0.33, 0.5, 1, 2, 3], score_size =int(score_size))
+
+    
+
     Rect2f roi = Rect(550.0f, 223.0f, 215.0f, 272.0f); // xywh format  
     Mat frame;
     // 000087.jpg

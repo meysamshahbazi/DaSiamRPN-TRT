@@ -75,6 +75,14 @@ Mat get_hann_win(Size sz);
 void postprocessResults(float * gpu_output,const nvinfer1::Dims &dims, int batch_size, std::string file_name);
 
 std::vector<vector<float>> xyxy2cxywh(float *box);
+
+// anchor = generate_anchor(total_stride=8, scales= [8, ], 
+                        //  ratios = [0.33, 0.5, 1, 2, 3], score_size =int(score_size))
+
+
+std::vector< vector<float> > generate_anchor(int total_stride, float scale, std::vector<float> ratios, int score_size);
+
+
 /*
 __global__ void fill_m(float * fg_bg,int * xyxy)
 {

@@ -91,6 +91,9 @@ DaSiam::DaSiam()
     cudaMalloc(&buffers_cls[0], binding_size);
     binding_size = 10*19*19*sizeof(float);
     cudaMalloc(&buffers_cls[1], 2);
+
+    anchor = generate_anchor(total_stride,scales,ratios,score_size);
+
 }
 
 DaSiam::~DaSiam()

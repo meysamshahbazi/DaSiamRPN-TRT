@@ -344,4 +344,54 @@ std::vector<vector<float>> xyxy2cxywh(float * box)
     return box_wh;
 }
 
+// anchor = generate_anchor(total_stride=8, scales= [8, ], 
+//                          ratios = [0.33, 0.5, 1, 2, 3], score_size =int(score_size))
+
+std::vector< vector<float> > generate_anchor(int total_stride, float scale, std::vector<float> ratios, int score_size)
+{
+    int anchor_num = ratios.size(); // we assume len(scale) = 1
+    std::vector< vector<float> > anchor;
+    int size = total_stride*total_stride;
+    int count = 0;
+    for(auto ratio:ratios)
+    {
+        for (int i=0;i<score_size*score_size;i++)
+        {
+            int ws = static_cast<int>( std::sqrt(size/ratio));
+            int hs = static_cast<int>( ws*ratio );
+            // becuse we have just one scale we skip FOR scale...
+            // TODO: change this for vector of scale ...
+            ws = ws*scale;
+            hs = hs*scale;
+
+            std::vector<float> elm;
+            elm.push_back(0);
+            elm.push_back(0);
+            elm.push_back(ws);
+            elm.push_back(hs);
+            anchor.push_back(elm);
+        }
+    }
+
+    int ori = -score_size *total_stride/ 2;
+    int index = 0;
+    for(int i=0; i<anchor_num; i++)
+    {   
+        for(int yy=0; yy<score_size; yy++)
+        {
+            for(int xx=0; xx<score_size; xx++)
+            {
+                anchor.at(index).at(0) = ori+total_stride*xx;
+                anchor.at(index).at(1) = ori+total_stride*yy;
+                index++;
+            }
+        }
+    }
+
+    // for(auto row:anchor)
+    //     cout<<row[0]<<"\t"<<row[1]<<"\t"<<row[2]<<"\t"<<row[3]<<"\n";
+
+    return anchor;
+}
+
 
