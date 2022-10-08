@@ -49,7 +49,9 @@ class SiamRPN(nn.Module):
     def forward(self, x):
         x_f = self.featureExtract(x)
         return self.regress_adjust(F.conv2d(self.conv_r2(x_f), self.r1_kernel)), \
-               F.conv2d(self.conv_cls2(x_f), self.cls1_kernel)
+               F.conv2d(self.conv_cls2(x_f), self.cls1_kernel), \
+                F.conv2d(self.conv_r2(x_f), self.r1_kernel), \
+                    F.conv2d(self.conv_cls2(x_f), self.cls1_kernel)
 
     def temple(self, z):
         z_f = self.featureExtract(z)

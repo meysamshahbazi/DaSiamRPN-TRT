@@ -39,9 +39,9 @@ private:
     const int score_size = (instance_size-exemplar_size)/total_stride+1;
     const float context_amount = 0.5; // context amount for the exemplar
     const bool adaptive = true; 
-    const float penalty_k = 0.055;
-    const float window_influence = 0.42;
-    const float p_lr = 0.295;
+    const float penalty_k = 0.22;
+    const float window_influence = 0.40;
+    const float p_lr = 0.3;
     const string  temple_path{"../../temple.onnx"};
     const string  siam_path{"../../SiamRPNOTB.onnx"};
     const string  regress_path{"../../RegressAdjust.onnx"};

@@ -121,8 +121,9 @@ void get_crop_single(Mat & im,Point2f target_pos_,
 
     real_scale = static_cast<float>(output_sz)/((br.x-tl.x+1)*df) ;   
 }
-void get_subwindow_tracking(const Mat &im, Point pos,int model_sz,int original_sz,Scalar avg_chans,Mat &im_patch)
+void get_subwindow_tracking_(const Mat &im, Point pos,int model_sz,int original_sz,Scalar avg_chans,Mat &im_patch)
 {
+    // this is my function based on python code 
     int sz = original_sz;
     Size im_sz = im.size();
     int cc = (original_sz+1) /2;
@@ -173,6 +174,40 @@ void get_subwindow_tracking(const Mat &im, Point pos,int model_sz,int original_s
     return;    
 }
 
+void get_subwindow_tracking(const Mat &img, Point pos,int model_sz,int original_sz,Scalar avg_chans,Mat &im_patch)
+{
+    // this is opencv function ...
+    Mat  dst;
+    Size imgSize = img.size();
+    float c = (original_sz + 1) / 2;
+    float xMin = (float)cvRound(pos.x - c);
+    float xMax = xMin + original_sz - 1;
+    float yMin = (float)cvRound(pos.y - c);
+    float yMax = yMin + original_sz - 1;
+
+    int leftPad = (int)(fmax(0., -xMin));
+    int topPad = (int)(fmax(0., -yMin));
+    int rightPad = (int)(fmax(0., xMax - imgSize.width + 1));
+    int bottomPad = (int)(fmax(0., yMax - imgSize.height + 1));
+
+    xMin = xMin + leftPad;
+    xMax = xMax + leftPad;
+    yMax = yMax + topPad;
+    yMin = yMin + topPad;
+
+    if (topPad == 0 && bottomPad == 0 && leftPad == 0 && rightPad == 0)
+    {
+        img(Rect(int(xMin), int(yMin), int(xMax - xMin + 1), int(yMax - yMin + 1))).copyTo(im_patch);
+    }
+    else
+    {
+        copyMakeBorder(img, dst, topPad, bottomPad, leftPad, rightPad, BORDER_CONSTANT, avg_chans);
+        dst(Rect(int(xMin), int(yMin), int(xMax - xMin + 1), int(yMax - yMin + 1))).copyTo(im_patch);
+    }
+    cv::resize(im_patch,im_patch,cv::Size(model_sz,model_sz));
+    // imshow("tracker",im_patch);waitKey(0);
+    // cout<<im_patch.size()<<endl;
+}
 void parseOnnxModel(const string & onnx_path,
                     size_t pool_size,
                     unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> &engine,
@@ -365,8 +400,8 @@ std::vector< vector<float> > generate_anchor(int total_stride, float scale, std:
             hs = hs*scale;
 
             std::vector<float> elm;
-            elm.push_back(0);
-            elm.push_back(0);
+            elm.push_back(0.0f);
+            elm.push_back(0.0f);
             elm.push_back(ws);
             elm.push_back(hs);
             anchor.push_back(elm);
@@ -381,8 +416,8 @@ std::vector< vector<float> > generate_anchor(int total_stride, float scale, std:
         {
             for(int xx=0; xx<score_size; xx++)
             {
-                anchor.at(index).at(0) = ori+total_stride*xx;
-                anchor.at(index).at(1) = ori+total_stride*yy;
+                anchor.at(index).at(0) = static_cast<float>(ori+total_stride*xx);
+                anchor.at(index).at(1) = static_cast<float>(ori+total_stride*yy);
                 index++;
             }
         }

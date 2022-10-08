@@ -86,7 +86,8 @@ def get_subwindow_tracking(im, pos, model_sz, original_sz, avg_chans, out_mode='
         im_patch = cv2.resize(im_patch_original, (model_sz, model_sz))  # zzp: use cv to get a better speed
     else:
         im_patch = im_patch_original
-
+    # cv2.imshow('SiamRPN', im_patch)
+    # cv2.waitKey(0)
     return im_to_torch(im_patch) if out_mode in 'torch' else im_patch
 
 
