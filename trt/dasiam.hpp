@@ -23,6 +23,7 @@
 #include <algorithm>
 #include "utils.hpp"
 #include <opencv2/core/types.hpp>
+#include <cudnn.h>
 
 using namespace std;
 using namespace cv;
@@ -59,7 +60,24 @@ private:
     float* score;
     float* blob;
     float* temple_blob;
+    // CUDNN stuff ...
+    cudnnHandle_t cudnn;
+    cudnnTensorDescriptor_t cls1_in_desc;// for score 10 ch
+    cudnnTensorDescriptor_t r1_in_desc; // for delta 20 ch
+    cudnnTensorDescriptor_t cls1_out_desc;
+    cudnnTensorDescriptor_t r1_out_desc;
+    cudnnFilterDescriptor_t cls1_kernel_desc;
+    cudnnFilterDescriptor_t r1_kernel_desc;
 
+    cudnnConvolutionDescriptor_t cls1_conv_desc;
+    cudnnConvolutionDescriptor_t r1_conv_desc;
+    size_t cls1_workspace_bytes = 0;
+    size_t r1_workspace_bytes = 0;
+
+    void* cls1_d_workspace{nullptr};
+    void* r1_d_workspace{nullptr};
+    const float cudnn_alpha = 1, cudnn_beta = 0;
+    // -------------------------------------------
     Point2f target_pos;
     Size2f target_sz;
     unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> engine_temple{nullptr};

@@ -97,6 +97,39 @@ DaSiam::DaSiam()
     score = new float[2*anchor.size()];
     blob = new float[3*instance_size*instance_size];
     temple_blob = new float[3*exemplar_size*exemplar_size];
+    // CUDNN stuff 
+    checkCUDNN(cudnnCreate(&cudnn));
+    checkCUDNN(cudnnCreateTensorDescriptor(&cls1_in_desc));
+    checkCUDNN(cudnnSetTensor4dDescriptor(cls1_in_desc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 1, 256, 22, 22));
+    checkCUDNN(cudnnCreateTensorDescriptor(&r1_in_desc));
+    checkCUDNN(cudnnSetTensor4dDescriptor(r1_in_desc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 1, 256, 22, 22));
+    checkCUDNN(cudnnCreateTensorDescriptor(&cls1_out_desc));
+    checkCUDNN(cudnnSetTensor4dDescriptor(cls1_out_desc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 1, 10, 19, 19));
+    checkCUDNN(cudnnCreateTensorDescriptor(&r1_out_desc));
+    checkCUDNN(cudnnSetTensor4dDescriptor(r1_out_desc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, 1, 20, 19, 19));
+    checkCUDNN(cudnnCreateFilterDescriptor(&cls1_kernel_desc));
+    checkCUDNN(cudnnSetFilter4dDescriptor(cls1_kernel_desc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW, 10, 256, 4, 4));
+    checkCUDNN(cudnnCreateFilterDescriptor(&r1_kernel_desc));
+    checkCUDNN(cudnnSetFilter4dDescriptor(r1_kernel_desc, CUDNN_DATA_FLOAT, CUDNN_TENSOR_NCHW, 20, 256, 4, 4));
+
+    checkCUDNN(cudnnCreateConvolutionDescriptor(&cls1_conv_desc));
+    checkCUDNN(cudnnSetConvolution2dDescriptor(cls1_conv_desc, 0, 0, 1, 1, 1, 1,
+                                            /*mode=*/CUDNN_CROSS_CORRELATION, // TODO: it may need change ... 
+                                            /*computeType=*/CUDNN_DATA_FLOAT));
+
+    checkCUDNN(cudnnCreateConvolutionDescriptor(&r1_conv_desc));
+    checkCUDNN(cudnnSetConvolution2dDescriptor(r1_conv_desc, 0, 0, 1, 1, 1, 1,
+                                            /*mode=*/CUDNN_CROSS_CORRELATION, // TODO: it may need change ... 
+                                            /*computeType=*/CUDNN_DATA_FLOAT));
+
+    cudnnGetConvolutionForwardWorkspaceSize(cudnn, cls1_in_desc,cls1_kernel_desc,cls1_conv_desc,cls1_out_desc,CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM,
+                                        &cls1_workspace_bytes);
+
+    cudnnGetConvolutionForwardWorkspaceSize(cudnn, r1_in_desc,r1_kernel_desc,r1_conv_desc,r1_out_desc,CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM,
+                                        &r1_workspace_bytes);
+
+    cudaMalloc(&cls1_d_workspace, cls1_workspace_bytes);
+    cudaMalloc(&r1_d_workspace, r1_workspace_bytes);
 }
 
 DaSiam::~DaSiam()
@@ -135,9 +168,9 @@ void DaSiam::init(const Mat &im, const Rect2f state)
     blobFromImage(z_crop,temple_blob);
     cudaMemcpyAsync(buffers_temple[0], temple_blob, 3 * exemplar_size * exemplar_size * sizeof(float), cudaMemcpyHostToDevice);
     context_temple->enqueueV2(buffers_temple.data(), 0, nullptr);
-    cudaStreamSynchronize(0); // this is vital to wait for last results ..
-    create_fconv_r(engine_r1,context_r1);
-    create_fconv_cls(engine_cls,context_cls);
+    // cudaStreamSynchronize(0); // this is vital to wait for last results ..
+    // create_fconv_r(engine_r1,context_r1);
+    // create_fconv_cls(engine_cls,context_cls);
 
     return;
 }
@@ -161,8 +194,20 @@ Rect2f DaSiam::update(const Mat &im)
     context_siam->enqueueV2(buffers_siam.data(), 0, nullptr);
     buffers_r1[0]  = buffers_siam[1]; // delta
     buffers_cls[0] = buffers_siam[2]; // score
-    context_r1->enqueueV2(buffers_r1.data(), 0, nullptr);
-    context_cls->enqueueV2(buffers_cls.data(), 0, nullptr); // TODO do it with cuDNN
+    // context_r1->enqueueV2(buffers_r1.data(), 0, nullptr);
+    // context_cls->enqueueV2(buffers_cls.data(), 0, nullptr); // TODO do it with cuDNN
+    // cudaStreamSynchronize(0);
+    checkCUDNN(
+    cudnnConvolutionForward(cudnn, &cudnn_alpha, cls1_in_desc, buffers_siam[2], cls1_kernel_desc, buffers_temple[2],
+                            cls1_conv_desc, CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM, cls1_d_workspace, cls1_workspace_bytes, 
+                            &cudnn_beta, cls1_out_desc, buffers_cls[1]) ); // TODO change buffer buffers_cls[1]
+
+    checkCUDNN(
+    cudnnConvolutionForward(cudnn, &cudnn_alpha, r1_in_desc, buffers_siam[1], r1_kernel_desc, buffers_temple[1],
+                            r1_conv_desc, CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM, r1_d_workspace, r1_workspace_bytes, 
+                            &cudnn_beta, r1_out_desc, buffers_r1[1]) ); // TODO change buffer buffers_cls[1]
+
+
     buffers_regress[0] = buffers_r1[1];
     context_regress->enqueueV2(buffers_regress.data(), 0, nullptr);
     int delta_size = anchor.size()*4;

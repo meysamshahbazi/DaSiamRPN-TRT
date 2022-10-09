@@ -21,6 +21,8 @@
 #include <opencv2/imgproc.hpp>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+#include <cudnn.h>
+
 
 using namespace cv;
 using namespace std;
@@ -35,6 +37,16 @@ struct  TRTDestroy
             // obj->destroy();
     }
 };
+
+#define checkCUDNN(expression)                               \
+  {                                                          \
+    cudnnStatus_t status = (expression);                     \
+    if (status != CUDNN_STATUS_SUCCESS) {                    \
+      std::cerr << "Error on line " << __LINE__ << ": "      \
+                << cudnnGetErrorString(status) << std::endl; \
+      std::exit(EXIT_FAILURE);                               \
+    }                                                        \
+  }
 
 void printDim(const nvinfer1::Dims& dims);
 
