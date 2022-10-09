@@ -1,14 +1,15 @@
 #include "dasiam.hpp"
 
 // #define GEN_ENGINE_FROM_ONNX
-#define LOAD_FROM_ONNX
-// #define LOAD_FROM_ENGINE
+// #define LOAD_FROM_ONNX
+#define LOAD_FROM_ENGINE
 
 DaSiam::DaSiam()
 {
 #ifdef GEN_ENGINE_FROM_ONNX
-    saveEngineFile(temple_path,temple_path_engine);
-    saveEngineFile(siam_path,siam_path_engine);
+    // saveEngineFile(temple_path,temple_path_engine);
+    // saveEngineFile(siam_path,siam_path_engine);
+    // saveEngineFile(regress_path,regress_path_engine);
     cout<<"finished serialization\n";
     return;
 #endif
@@ -19,7 +20,8 @@ DaSiam::DaSiam()
 #endif
 #ifdef LOAD_FROM_ENGINE
     parseEngineModel(temple_path_engine,engine_temple,context_temple);
-    parseEngineModel(siam_path,engine_siam,context_siam);
+    parseEngineModel(siam_path_engine,engine_siam,context_siam);
+    parseEngineModel(regress_path_engine,engine_regress,context_regress);
 #endif    
 
     buffers_temple.reserve(engine_temple->getNbBindings());
@@ -46,7 +48,7 @@ DaSiam::DaSiam()
     {
         auto binding_size = getSizeByDim(engine_siam->getBindingDimensions(i)) * 1 * sizeof(float);
         cudaMalloc(&buffers_siam[i], binding_size);
-        std::cout<<engine_siam->getBindingName(i);//"|" <<engine_siam->getBindingDimensions(i)<<std::endl;
+        std::cout<<engine_siam->getBindingName(i);
         printDim(engine_siam->getBindingDimensions(i));
         if (engine_siam->bindingIsInput(i))
         {  
@@ -64,7 +66,7 @@ DaSiam::DaSiam()
     {
         auto binding_size = getSizeByDim(engine_regress->getBindingDimensions(i)) * 1 * sizeof(float);
         cudaMalloc(&buffers_regress[i], binding_size);
-        std::cout<<engine_regress->getBindingName(i);//"|" <<engine_regress->getBindingDimensions(i)<<std::endl;
+        std::cout<<engine_regress->getBindingName(i);
         printDim(engine_regress->getBindingDimensions(i));
         if (engine_regress->bindingIsInput(i))
         {  
@@ -137,41 +139,6 @@ void DaSiam::init(const Mat &im, const Rect2f state)
     create_fconv_r(engine_r1,context_r1);
     create_fconv_cls(engine_cls,context_cls);
 
-    // cout<<"------------------------------"<<endl;
-    // for (size_t i = 0; i < engine_r1->getNbBindings(); ++i)
-    // {
-    //     auto binding_size = getSizeByDim(engine_r1->getBindingDimensions(i)) * 1 * sizeof(float);
-    //     // cudaMalloc(&buffers_r1[i], binding_size);
-    //     std::cout<<engine_r1->getBindingName(i)<<endl;//"|" <<engine_r1->getBindingDimensions(i)<<std::endl;
-    //     printDim(engine_r1->getBindingDimensions(i));
-    //     if (engine_r1->bindingIsInput(i))
-    //     {  
-    //         input_dims_r1.emplace_back(engine_r1->getBindingDimensions(i));
-    //     }
-    //     else
-    //     {
-    //         output_dims_r1.emplace_back(engine_r1->getBindingDimensions(i));
-    //     }
-    // }
-
-    // // buffers_cls.reserve(engine_cls->getNbBindings());
-    // cout<<"------------------------------"<<endl;
-    // for (size_t i = 0; i < engine_cls->getNbBindings(); ++i)
-    // {
-    //     auto binding_size = getSizeByDim(engine_cls->getBindingDimensions(i)) * 1 * sizeof(float);
-    //     // cudaMalloc(&buffers_cls[i], binding_size);
-    //     std::cout<<engine_cls->getBindingName(i)<<endl;;//"|" <<engine_cls->getBindingDimensions(i)<<std::endl;
-    //     printDim(engine_cls->getBindingDimensions(i));
-    //     if (engine_cls->bindingIsInput(i))
-    //     {  
-    //         input_dims_cls.emplace_back(engine_cls->getBindingDimensions(i));
-    //     }
-    //     else
-    //     {
-    //         output_dims_cls.emplace_back(engine_cls->getBindingDimensions(i));
-    //     }
-    // }
-    // cout<<"------------------------------"<<endl;
     return;
 }
 
@@ -187,37 +154,22 @@ Rect2f DaSiam::update(const Mat &im)
     Mat x_crop;
     int64 t1 = cv::getTickCount();
     get_subwindow_tracking(im,target_pos,instance_size,s_x,avg_chans,x_crop);
-    // cv::imshow("x_crop",x_crop);cv::waitKey(0);
-    //from this line: def tracker_eval function
 
     target_sz = target_sz*scale_z;
     blobFromImage(x_crop,blob);
-    // for(int i = 0;i<3*instance_size*instance_size;i++) blob[i] = 255.0f; // fill with ones
     cudaMemcpyAsync(buffers_siam[0], blob, 3 * instance_size * instance_size * sizeof(float), cudaMemcpyHostToDevice);
     context_siam->enqueueV2(buffers_siam.data(), 0, nullptr);
-    // cudaStreamSynchronize(0);
     buffers_r1[0]  = buffers_siam[1]; // delta
     buffers_cls[0] = buffers_siam[2]; // score
-    // cudaMemcpyAsync(buffers_r1[0], buffers_siam[1], 256*22*22*sizeof(float), cudaMemcpyDeviceToDevice);
-    // cudaMemcpyAsync(buffers_cls[0], buffers_siam[2], 256*22*22*sizeof(float), cudaMemcpyDeviceToDevice);
     context_r1->enqueueV2(buffers_r1.data(), 0, nullptr);
     context_cls->enqueueV2(buffers_cls.data(), 0, nullptr); // TODO do it with cuDNN
     buffers_regress[0] = buffers_r1[1];
-    // cudaStreamSynchronize(0);
-    // cudaMemcpyAsync(buffers_regress[0], buffers_r1[1], 20*19*19*sizeof(float), cudaMemcpyDeviceToDevice);
     context_regress->enqueueV2(buffers_regress.data(), 0, nullptr);
     int delta_size = anchor.size()*4;
-
     cudaMemcpyAsync(delta, buffers_regress[1], delta_size*sizeof(float), cudaMemcpyDeviceToHost);
-    cudaMemcpyAsync(score, buffers_cls[1], 2*anchor.size()*sizeof(float), cudaMemcpyDeviceToHost);
-    
+    cudaMemcpyAsync(score, buffers_cls[1], 2*anchor.size()*sizeof(float), cudaMemcpyDeviceToHost);    
     cudaStreamSynchronize(0);
 
-    // int64 t2 = cv::getTickCount();
-    // int64 tick_counter = t2 - t1;
-    // cout << "FPS: " << ((double)(1.0f)) / (static_cast<double>(tick_counter) / cv::getTickFrequency()) << endl;
-    // delta in shape of [4,1805]
-    
     pscore.clear(); // TODO:use fixed size array instead of vector
     penalty.clear();
     std::vector<float> temp_score;
@@ -309,6 +261,7 @@ void DaSiam::create_fconv_r(unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> &engine
     conv1->getOutput(0)->setName("fconv_r1_kernel");
     network->markOutput(*conv1->getOutput(0));
     config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE,1 << 24);
+    // config->setMaxWorkspaceSize(1U<<24);
     config->setFlag(nvinfer1::BuilderFlag::kFP16);
     unique_ptr<nvinfer1::IHostMemory,TRTDestroy> serializedModel{builder->buildSerializedNetwork(*network, *config)};
     nvinfer1::IRuntime* runtime = nvinfer1::createInferRuntime(logger);
@@ -335,6 +288,7 @@ void DaSiam::create_fconv_cls(unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> &engi
     conv1->getOutput(0)->setName("fconv_cls_kernel");
     network->markOutput(*conv1->getOutput(0));
     config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE,1 << 24);
+    // config->setMaxWorkspaceSize(1U<<24);
     config->setFlag(nvinfer1::BuilderFlag::kFP16);
     unique_ptr<nvinfer1::IHostMemory,TRTDestroy> serializedModel{builder->buildSerializedNetwork(*network, *config)};
     nvinfer1::IRuntime* runtime = nvinfer1::createInferRuntime(logger);

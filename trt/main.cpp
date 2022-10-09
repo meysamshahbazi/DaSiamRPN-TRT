@@ -25,12 +25,10 @@ int main(int argc, const char ** argv)
     int64 tick_counter = 0;
     int frame_idx = 0;
     DaSiam ds;
-    // int64 t1 = cv::getTickCount();
+    // return 0;
+  
     ds.init(frame,roi);
-    // int64 t2 = cv::getTickCount();
-    // tick_counter += t2 - t1;
-
-    cout << "FPS: " << ((double)(frame_idx)) / (static_cast<double>(tick_counter) / cv::getTickFrequency()) << endl;
+  
     rectangle(frame, roi, Scalar( 255, 0, 0 ), 2, 1 );
     imshow("tracker",frame);
     // waitKey(0);

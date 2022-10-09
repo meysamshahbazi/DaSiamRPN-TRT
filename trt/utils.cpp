@@ -95,7 +95,7 @@ void parseOnnxModel(const string & onnx_path,
     // lets create config file for engine 
     unique_ptr<nvinfer1::IBuilderConfig,TRTDestroy> config{builder->createBuilderConfig()};
     config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE,pool_size);
-    // config->setMaxWorkspaceSize(1U<<30);
+    // config->setMaxWorkspaceSize(pool_size);
 
     // use fp16 if it is possible 
     if (builder->platformHasFastFp16())
@@ -129,7 +129,7 @@ void saveEngineFile(const string & onnx_path,
     // lets create config file for engine 
     unique_ptr<nvinfer1::IBuilderConfig,TRTDestroy> config{builder->createBuilderConfig()};
     config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE,1U<<30);
-    // config->setMaxWorkspaceSize(1U<<30);
+    // config->setMaxWorkspaceSize(1U<<24);
 
     // use fp16 if it is possible 
     if (builder->platformHasFastFp16())
