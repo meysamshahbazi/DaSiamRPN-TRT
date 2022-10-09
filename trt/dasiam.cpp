@@ -90,8 +90,11 @@ DaSiam::DaSiam()
     cudaMalloc(&buffers_cls[1], binding_size);
 
     anchor = generate_anchor(total_stride,scales,ratios,score_size);
-
     window = get_hann_win(Size(score_size,score_size));
+    delta = new float[4*anchor.size()];
+    score = new float[2*anchor.size()];
+    blob = new float[3*instance_size*instance_size];
+    temple_blob = new float[3*exemplar_size*exemplar_size];
 }
 
 DaSiam::~DaSiam()
@@ -106,6 +109,13 @@ DaSiam::~DaSiam()
     
     for (void * buf : buffers_cls)
         cudaFree(buf);
+    for (void * buf : buffers_regress)
+        cudaFree(buf);
+
+    delete[] score;
+    delete[] delta;
+    delete[] blob;
+    delete[] temple_blob;
 }
 
 void DaSiam::init(const Mat &im, const Rect2f state)
@@ -120,73 +130,53 @@ void DaSiam::init(const Mat &im, const Rect2f state)
     int s_z = std::round<int>(std::sqrt(wc_z*hc_z));
     Mat z_crop;
     get_subwindow_tracking(im,target_pos,exemplar_size,s_z,avg_chans,z_crop);
-    float * temple_blob = new float[3*exemplar_size*exemplar_size];
     blobFromImage(z_crop,temple_blob);
     cudaMemcpyAsync(buffers_temple[0], temple_blob, 3 * exemplar_size * exemplar_size * sizeof(float), cudaMemcpyHostToDevice);
     context_temple->enqueueV2(buffers_temple.data(), 0, nullptr);
-    cudaStreamSynchronize(0);
-    /*
-    float* score__ = new float[20*256*4*4];
-    cudaMemcpyAsync(score__, buffers_temple[1], 20*256*4*4*sizeof(float), cudaMemcpyDeviceToHost);
-    cudaStreamSynchronize(0);
-    for(int i = 0;i<20*256*4*4;i=i+16) cout<<score__[i]<<endl;
-*/
+    cudaStreamSynchronize(0); // this is vital to wait for last results ..
     create_fconv_r(engine_r1,context_r1);
     create_fconv_cls(engine_cls,context_cls);
 
-    // buffers_r1.reserve(engine_r1->getNbBindings());
-    cout<<"------------------------------"<<endl;
-    for (size_t i = 0; i < engine_r1->getNbBindings(); ++i)
-    {
-        auto binding_size = getSizeByDim(engine_r1->getBindingDimensions(i)) * 1 * sizeof(float);
-        // cudaMalloc(&buffers_r1[i], binding_size);
-        std::cout<<engine_r1->getBindingName(i)<<endl;//"|" <<engine_r1->getBindingDimensions(i)<<std::endl;
-        printDim(engine_r1->getBindingDimensions(i));
-        if (engine_r1->bindingIsInput(i))
-        {  
-            input_dims_r1.emplace_back(engine_r1->getBindingDimensions(i));
-        }
-        else
-        {
-            output_dims_r1.emplace_back(engine_r1->getBindingDimensions(i));
-        }
-    }
+    // cout<<"------------------------------"<<endl;
+    // for (size_t i = 0; i < engine_r1->getNbBindings(); ++i)
+    // {
+    //     auto binding_size = getSizeByDim(engine_r1->getBindingDimensions(i)) * 1 * sizeof(float);
+    //     // cudaMalloc(&buffers_r1[i], binding_size);
+    //     std::cout<<engine_r1->getBindingName(i)<<endl;//"|" <<engine_r1->getBindingDimensions(i)<<std::endl;
+    //     printDim(engine_r1->getBindingDimensions(i));
+    //     if (engine_r1->bindingIsInput(i))
+    //     {  
+    //         input_dims_r1.emplace_back(engine_r1->getBindingDimensions(i));
+    //     }
+    //     else
+    //     {
+    //         output_dims_r1.emplace_back(engine_r1->getBindingDimensions(i));
+    //     }
+    // }
 
-    // buffers_cls.reserve(engine_cls->getNbBindings());
-    cout<<"------------------------------"<<endl;
-    for (size_t i = 0; i < engine_cls->getNbBindings(); ++i)
-    {
-        auto binding_size = getSizeByDim(engine_cls->getBindingDimensions(i)) * 1 * sizeof(float);
-        // cudaMalloc(&buffers_cls[i], binding_size);
-        std::cout<<engine_cls->getBindingName(i)<<endl;;//"|" <<engine_cls->getBindingDimensions(i)<<std::endl;
-        printDim(engine_cls->getBindingDimensions(i));
-        if (engine_cls->bindingIsInput(i))
-        {  
-            input_dims_cls.emplace_back(engine_cls->getBindingDimensions(i));
-        }
-        else
-        {
-            output_dims_cls.emplace_back(engine_cls->getBindingDimensions(i));
-        }
-    }
-    cout<<"------------------------------"<<endl;
-    // cout<<z_crop.size()<<endl;
-    // cv::imshow("z_crop",z_crop);
-    
+    // // buffers_cls.reserve(engine_cls->getNbBindings());
+    // cout<<"------------------------------"<<endl;
+    // for (size_t i = 0; i < engine_cls->getNbBindings(); ++i)
+    // {
+    //     auto binding_size = getSizeByDim(engine_cls->getBindingDimensions(i)) * 1 * sizeof(float);
+    //     // cudaMalloc(&buffers_cls[i], binding_size);
+    //     std::cout<<engine_cls->getBindingName(i)<<endl;;//"|" <<engine_cls->getBindingDimensions(i)<<std::endl;
+    //     printDim(engine_cls->getBindingDimensions(i));
+    //     if (engine_cls->bindingIsInput(i))
+    //     {  
+    //         input_dims_cls.emplace_back(engine_cls->getBindingDimensions(i));
+    //     }
+    //     else
+    //     {
+    //         output_dims_cls.emplace_back(engine_cls->getBindingDimensions(i));
+    //     }
+    // }
+    // cout<<"------------------------------"<<endl;
     return;
 }
 
 Rect2f DaSiam::update(const Mat &im)
 {
-
-    
-
-
-    float* delta = new float[4*anchor.size()];
-    float* score = new float[2*anchor.size()];
-    float* blob = new float[3*instance_size*instance_size];
-    
-    
     float wc_z = target_sz.width + context_amount*(target_sz.width+target_sz.height);
     float hc_z = target_sz.height + context_amount*(target_sz.width+target_sz.height);
     float s_z = std::sqrt(wc_z*hc_z);
@@ -205,16 +195,16 @@ Rect2f DaSiam::update(const Mat &im)
     // for(int i = 0;i<3*instance_size*instance_size;i++) blob[i] = 255.0f; // fill with ones
     cudaMemcpyAsync(buffers_siam[0], blob, 3 * instance_size * instance_size * sizeof(float), cudaMemcpyHostToDevice);
     context_siam->enqueueV2(buffers_siam.data(), 0, nullptr);
-    cudaStreamSynchronize(0);
-    // buffers_r1[0]  = buffers_siam[1]; // delta
-    // buffers_cls[0] = buffers_siam[2]; // score
-    cudaMemcpyAsync(buffers_r1[0], buffers_siam[1], 256*22*22*sizeof(float), cudaMemcpyDeviceToDevice);
-    cudaMemcpyAsync(buffers_cls[0], buffers_siam[2], 256*22*22*sizeof(float), cudaMemcpyDeviceToDevice);
+    // cudaStreamSynchronize(0);
+    buffers_r1[0]  = buffers_siam[1]; // delta
+    buffers_cls[0] = buffers_siam[2]; // score
+    // cudaMemcpyAsync(buffers_r1[0], buffers_siam[1], 256*22*22*sizeof(float), cudaMemcpyDeviceToDevice);
+    // cudaMemcpyAsync(buffers_cls[0], buffers_siam[2], 256*22*22*sizeof(float), cudaMemcpyDeviceToDevice);
     context_r1->enqueueV2(buffers_r1.data(), 0, nullptr);
     context_cls->enqueueV2(buffers_cls.data(), 0, nullptr); // TODO do it with cuDNN
-    //  buffers_regress[0] = buffers_r1[1];
-    cudaStreamSynchronize(0);
-    cudaMemcpyAsync(buffers_regress[0], buffers_r1[1], 20*19*19*sizeof(float), cudaMemcpyDeviceToDevice);
+    buffers_regress[0] = buffers_r1[1];
+    // cudaStreamSynchronize(0);
+    // cudaMemcpyAsync(buffers_regress[0], buffers_r1[1], 20*19*19*sizeof(float), cudaMemcpyDeviceToDevice);
     context_regress->enqueueV2(buffers_regress.data(), 0, nullptr);
     int delta_size = anchor.size()*4;
 
@@ -223,20 +213,6 @@ Rect2f DaSiam::update(const Mat &im)
     cudaMemcpyAsync(score, buffers_cls[1], 2*anchor.size()*sizeof(float), cudaMemcpyDeviceToHost);
     
     cudaStreamSynchronize(0);
-    // cudaStreamSynchronize(0);
-    
-
-     //FOR_DEBUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG
-     
-    // float* score__ = new float[ anchor.size()*4];
-    // cudaMemcpyAsync(score__, buffers_regress[1], anchor.size()*4*sizeof(float), cudaMemcpyDeviceToHost);
-    // cudaStreamSynchronize(0);
-    // for(int i = 0;i< anchor.size()*4;i=i+anchor.size()) cout<<score__[i]<<endl;
-    // cout<<"buffers_regress\n";
-    
-    
-    // 
-
 
     int64 t2 = cv::getTickCount();
     int64 tick_counter = t2 - t1;
@@ -374,9 +350,7 @@ Rect2f DaSiam::update(const Mat &im)
     target_pos = new_target_pos;
     target_sz = new_target_sz;
 
-    delete[] score;
-    delete[] delta;
-    delete[] blob;
+
     // cv::waitKey(0);
     
     return track_rect;//cv::Rect2f(target_pos.x,target_pos.y,target_sz.width,target_sz.height);

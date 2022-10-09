@@ -156,7 +156,7 @@ def SiamRPN_init(im, target_pos, target_sz, net):
     p.update(net.cfg)
     state['im_h'] = im.shape[0]
     state['im_w'] = im.shape[1]
-    print("init target_sz",target_sz)
+    
     if p.adaptive:
         if ((target_sz[0] * target_sz[1]) / float(state['im_h'] * state['im_w'])) < 0.004:
             p.instance_size = 287  # small object big search region

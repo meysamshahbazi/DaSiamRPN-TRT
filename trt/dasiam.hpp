@@ -53,6 +53,11 @@ private:
     Logger logger;
 
     // end of config -----------------------------------------------------------------
+    float* delta;
+    float* score;
+    float* blob;
+    float* temple_blob;
+
     Point2f target_pos;
     Size2f target_sz;
     unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> engine_temple{nullptr};
