@@ -39,7 +39,6 @@ DaSiam::DaSiam()
             output_dims_temple.emplace_back(engine_temple->getBindingDimensions(i));
         }
     }
-
     
     buffers_siam.reserve(engine_siam->getNbBindings());
     cout<<"------------------------------"<<endl;
@@ -77,8 +76,6 @@ DaSiam::DaSiam()
         }
     }
 
-
-
     size_t binding_size;
     buffers_r1.reserve(2);
     binding_size = 256*22*22*sizeof(float);
@@ -94,6 +91,7 @@ DaSiam::DaSiam()
 
     anchor = generate_anchor(total_stride,scales,ratios,score_size);
 
+    window = get_hann_win(Size(score_size,score_size));
 }
 
 DaSiam::~DaSiam()
@@ -108,53 +106,22 @@ DaSiam::~DaSiam()
     
     for (void * buf : buffers_cls)
         cudaFree(buf);
-
-
 }
-
-void blobFromImage(cv::Mat& img,float* blob){
-    int img_h = img.rows;
-    int img_w = img.cols;
-    int data_idx = 0;
-    for (int i = 0; i < img_h; ++i)
-    {
-        uchar* pixel = img.ptr<uchar>(i);  // point to first color in row
-        for (int j = 0; j < img_w; ++j)
-        {
-            blob[data_idx+0*img_h*img_w] = static_cast<float>(*pixel++);
-            blob[data_idx+1*img_h*img_w] = static_cast<float>(*pixel++);
-            blob[data_idx+2*img_h*img_w] = static_cast<float>(*pixel++);
-            data_idx++;
-        }
-    }
-}
-
 
 void DaSiam::init(const Mat &im, const Rect2f state)
 {
     target_pos = (state.br()+state.tl())/2;
     target_sz = state.size();
-    cout<<"init target_sz "<<target_sz<<endl;
     im_h = im.rows;
     im_w = im.cols;
-    // there is some stuf in init fucntion in python for small object!!!!
-    // in this stage I've ignored that :D
-
-    // p.anchor = generate_anchor(p.total_stride, p.scales, p.ratios, int(p.score_size))
-    window = get_hann_win(Size(score_size,score_size));
     avg_chans = cv::mean(im);
-
     float wc_z = target_sz.width + context_amount*(target_sz.width+target_sz.height);
     float hc_z = target_sz.height + context_amount*(target_sz.width+target_sz.height);
-
     int s_z = std::round<int>(std::sqrt(wc_z*hc_z));
-
     Mat z_crop;
     get_subwindow_tracking(im,target_pos,exemplar_size,s_z,avg_chans,z_crop);
     float * temple_blob = new float[3*exemplar_size*exemplar_size];
     blobFromImage(z_crop,temple_blob);
-    // for(int i = 0;i<3*exemplar_size*exemplar_size;i++) temple_blob[i] = 255.0f; // fill with ones
-    // for(int i = 0;i<3*exemplar_size*exemplar_size;i++) cout<<temple_blob[i]<<", "; cout<<endl;
     cudaMemcpyAsync(buffers_temple[0], temple_blob, 3 * exemplar_size * exemplar_size * sizeof(float), cudaMemcpyHostToDevice);
     context_temple->enqueueV2(buffers_temple.data(), 0, nullptr);
     cudaStreamSynchronize(0);

@@ -1,5 +1,8 @@
 ## TODO:
 - [ ] solve F.conv of last ...
+- [ ] memory management
+- [ ] use cudnn
+- [ ] use engine files
 
 :trophy:News: **We won the VOT-18 real-time challenge**
 

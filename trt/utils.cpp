@@ -40,139 +40,6 @@ void printDim(const nvinfer1::Dims& dims)
     }
     cout<<" ]\n";
 }
-void get_crop_single(Mat & im,Point2f target_pos_,
-                                float target_scale,int output_sz,Scalar avg_chans,
-                                Mat &im_patch,float &real_scale) // these are output 
-{
-    // reversed pos!! 
-    // pos is target_pos
-    Point2i posl = Point2i(target_pos_);
-    float sample_sz = target_scale*output_sz;    
-    float resize_factor = sample_sz/output_sz;
-    
-    int df = std::max(static_cast<int>(resize_factor-0.1),1);
-    Mat im2;
-
-    if (df > 1)
-    {
-        // Point2i os = Point2i(static_cast<int>(target_pos_.x) % df,static_cast<int>(target_pos_.y) % df);
-        Point2i os = Point2i( posl.x % df, posl.y % df);
-        std::vector<uchar> im_rows;
-        std::vector< std::vector<uchar> > im_cols;
-        posl = Point2i((posl.x-os.x)/df , (posl.y-os.y)/df);
-        int channels = im.channels();
-
-        int nRows = im.rows;
-        int nCols = im.cols * channels;
-        int i,j;
-        uchar* p;
-        std::vector<uchar> pixel_vec;
-        
-        int reduced_row_sz = (im.rows - os.x+df-1)/df;
-        int reduced_col_sz = (im.cols - os.y+df-1)/df;
-
-        uchar img_data[reduced_row_sz*reduced_col_sz*3];
-        int data_idx = 0;
-        for( i = os.x; i < nRows; i+=df)
-        {
-            uchar* pixel = im.ptr<uchar>(i);  // point to first color in row
-            for ( j = os.y*3; j < nCols;j+=3*df)
-            {
-                img_data[data_idx] = *pixel++;
-                img_data[data_idx+1] = *pixel++;
-                img_data[data_idx+2] = *pixel++;
-                data_idx+=3;
-                pixel += 3*df-3;
-            }
-        }
-        im2 = cv::Mat(reduced_row_sz, reduced_col_sz, CV_8UC3,img_data);
-    }
-    else
-    {
-        im2 = im;
-    }
-
-    float sz = sample_sz/df;
-    int szl = std::max(static_cast<int>(std::round(sz)) ,2);
-
-    Point2i tl = Point2i(posl.x-(szl-1)/2,posl.y-(szl-1)/2);
-    Point2i br = Point2i(posl.x+szl/2+1,posl.y+szl/2+1);
-
-    float M_13 = tl.x;
-    float M_23 = tl.y;
-    float M_11 = (br.x-M_13)/(output_sz-1);
-    float M_22 = (br.y-M_23)/(output_sz-1);
-
-    float arr[2][3] = { 
-                        {M_11,0,M_13},
-                        {0,M_22,M_23}
-                        };
-
-    Mat mat2x3 = Mat(2,3,CV_32FC1 ,arr);
-
-    cv::warpAffine( im2,
-                    im_patch,
-                    mat2x3,
-                    Size(output_sz,output_sz),
-                    INTER_LINEAR | WARP_INVERSE_MAP,
-                    BORDER_CONSTANT,
-                    avg_chans
-    ); 	
-
-    real_scale = static_cast<float>(output_sz)/((br.x-tl.x+1)*df) ;   
-}
-void get_subwindow_tracking_(const Mat &im, Point pos,int model_sz,int original_sz,Scalar avg_chans,Mat &im_patch)
-{
-    // this is my function based on python code 
-    int sz = original_sz;
-    Size im_sz = im.size();
-    int cc = (original_sz+1) /2;
-    int context_xmin = pos.x - cc;
-    int context_xmax = context_xmin + sz -1;
-    int context_ymin = pos.y - cc;
-    int context_ymax = context_ymin + sz -1;
-    int left_pad = std::max(0,-context_xmin);
-    int top_pad = std::max(0,-context_ymin);
-    int right_pad = max(0, context_xmax - im_sz.width + 1);
-    int bottom_pad = max(0, context_ymax - im_sz.height + 1);
-
-    context_xmin = context_xmin + left_pad;
-    context_xmax = context_xmax + left_pad;
-    context_ymin = context_ymin + top_pad;
-    context_ymax = context_ymax + top_pad;
-    int r = im.rows;
-    int c = im.cols;
-    Mat im_patch_original;
-    if(top_pad || bottom_pad || right_pad || left_pad)
-    {
-        Mat te_im = Mat(r+top_pad+bottom_pad, c+left_pad+right_pad, CV_8UC3,avg_chans);
-        im.copyTo(te_im(Rect(0,0,c,r)));
-
-        if(top_pad) // te_im[0:top_pad, left_pad:left_pad + c, :] = avg_chans
-            te_im(Rect(left_pad, 0, c, top_pad)) = avg_chans;
-        if(bottom_pad) // te_im[r + top_pad:, left_pad:left_pad + c, :] = avg_chans
-            te_im(Rect(left_pad, r+top_pad,c , bottom_pad)) = avg_chans;
-        if(left_pad) // te_im[0:, 0:left_pad, :] = avg_chans
-            te_im(Rect(0, 0,left_pad , r+top_pad+bottom_pad)) = avg_chans;
-        if(right_pad) // te_im[:, c + left_pad:, :] = avg_chans
-            te_im(Rect(c+left_pad,0,right_pad,r+top_pad+bottom_pad)) = avg_chans;
-
-        Rect roi = Rect(context_xmin,context_ymin,context_xmax-context_xmin,context_ymax-context_ymin);
-        im_patch_original = te_im(roi);
-    }       
-    else
-    {
-        Rect roi = Rect(context_xmin,context_ymin,context_xmax-context_xmin,context_ymax-context_ymin);
-        im_patch_original = im(roi);
-    }
-
-    if(model_sz != original_sz)
-        cv::resize(im_patch_original,im_patch,cv::Size(model_sz,model_sz));
-    else 
-        im_patch = im_patch_original;
-        
-    return;    
-}
 
 void get_subwindow_tracking(const Mat &img, Point pos,int model_sz,int original_sz,Scalar avg_chans,Mat &im_patch)
 {
@@ -205,8 +72,6 @@ void get_subwindow_tracking(const Mat &img, Point pos,int model_sz,int original_
         dst(Rect(int(xMin), int(yMin), int(xMax - xMin + 1), int(yMax - yMin + 1))).copyTo(im_patch);
     }
     cv::resize(im_patch,im_patch,cv::Size(model_sz,model_sz));
-    // imshow("tracker",im_patch);waitKey(0);
-    // cout<<im_patch.size()<<endl;
 }
 void parseOnnxModel(const string & onnx_path,
                     size_t pool_size,
@@ -229,40 +94,18 @@ void parseOnnxModel(const string & onnx_path,
     }
     // lets create config file for engine 
     unique_ptr<nvinfer1::IBuilderConfig,TRTDestroy> config{builder->createBuilderConfig()};
-
     config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE,pool_size);
     // config->setMaxWorkspaceSize(1U<<30);
 
     // use fp16 if it is possible 
-
     if (builder->platformHasFastFp16())
     {
         config->setFlag(nvinfer1::BuilderFlag::kFP16);
     }
-    
-
-    // builder->platformHasFastInt8
-    
-    // config->setInt8Calibrator
-
-    // setm max bach size as it is very importannt for trt
-    // builder->setMaxBatchSize(1);
-    // create engine and excution context
     unique_ptr<nvinfer1::IHostMemory,TRTDestroy> serializedModel{builder->buildSerializedNetwork(*network, *config)};
-
     nvinfer1::IRuntime* runtime = nvinfer1::createInferRuntime(logger);
-
-
     engine.reset(runtime->deserializeCudaEngine( serializedModel->data(), serializedModel->size()) );
-
-
-
-    // serializedModel->
-    // auto tmp = builder->buildEngineWithConfig(*network,*config);
-    // engine.reset(builder->buildEngineWithConfig(*network,*config));
-    // engine.reset(builder->buildSerializedNetwork(*network,*config));
     context.reset(engine->createExecutionContext());
-
     return;
 }
 
@@ -285,33 +128,26 @@ void saveEngineFile(const string & onnx_path,
     }
     // lets create config file for engine 
     unique_ptr<nvinfer1::IBuilderConfig,TRTDestroy> config{builder->createBuilderConfig()};
-
     config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE,1U<<30);
     // config->setMaxWorkspaceSize(1U<<30);
 
     // use fp16 if it is possible 
-
     if (builder->platformHasFastFp16())
     {
         config->setFlag(nvinfer1::BuilderFlag::kFP16);
     }
-    // setm max bach size as it is very importannt for trt
-    builder->setMaxBatchSize(1);
+
     // create engine and excution context
     unique_ptr<nvinfer1::IHostMemory,TRTDestroy> serializedModel{builder->buildSerializedNetwork(*network, *config)};
-
     std::ofstream p(engine_path, std::ios::binary);
     if (!p)
     {
         std::cerr << "could not open plan output file" << std::endl;
         return;
     }
-
     p.write(reinterpret_cast<const char*>(serializedModel->data()), serializedModel->size());
     return;
 }
-
-
 
 void parseEngineModel(const string & engine_file_path,
                     unique_ptr<nvinfer1::ICudaEngine,TRTDestroy> &engine,
@@ -320,9 +156,7 @@ void parseEngineModel(const string & engine_file_path,
     Logger logger;
     char *trtModelStream{nullptr};
     size_t size{0};
-
     std::ifstream file(engine_file_path, std::ios::binary);
-    
     if (file.good()) 
     {
         file.seekg(0, file.end);
@@ -344,43 +178,6 @@ void parseEngineModel(const string & engine_file_path,
     delete[] trtModelStream;
     return;
 }     
-
-
-
-void postprocessResults(float * gpu_output,const nvinfer1::Dims &dims, int batch_size, std::string file_name)
-{
-    // auto classes = getClassNames("../imagenet_classes.txt");
-
-    vector<float> cpu_output(getSizeByDim(dims)*batch_size);
-    cudaMemcpy(cpu_output.data(),gpu_output,cpu_output.size()*sizeof(float),cudaMemcpyDeviceToHost);
-    cout<<"size : "<<cpu_output.size()<<endl;
-
-    std::ofstream out_file{file_name + ".txt"};
-    for (const auto &v :cpu_output)
-            out_file << v << std::endl;
-
-    out_file.close();
-
-
-}
-
-// std::vector<vector<float>> xyxy2cxywh(const std::vector<float> & box)
-std::vector<vector<float>> xyxy2cxywh(float * box)
-{
-    std::vector<vector<float>> box_wh;
-    for(int i = 0;i < 625; i++)
-    {
-        float cx = (box[4*i+0]+box[4*i+2])/2;
-        float cy = (box[4*i+1]+box[4*i+3])/2;
-        float w = box[4*i+2]-box[4*i+0]+1;
-        float h = box[4*i+3]-box[4*i+1]+1;
-        box_wh.push_back({cx,cy,w,h});
-    } 
-    return box_wh;
-}
-
-// anchor = generate_anchor(total_stride=8, scales= [8, ], 
-//                          ratios = [0.33, 0.5, 1, 2, 3], score_size =int(score_size))
 
 std::vector< vector<float> > generate_anchor(int total_stride, float scale, std::vector<float> ratios, int score_size)
 {
@@ -423,10 +220,23 @@ std::vector< vector<float> > generate_anchor(int total_stride, float scale, std:
         }
     }
 
-    // for(auto row:anchor)
-    //     cout<<row[0]<<"\t"<<row[1]<<"\t"<<row[2]<<"\t"<<row[3]<<"\n";
-
     return anchor;
 }
 
-
+void blobFromImage(cv::Mat& img, float* blob)
+{
+    int img_h = img.rows;
+    int img_w = img.cols;
+    int data_idx = 0;
+    for (int i = 0; i < img_h; ++i)
+    {
+        uchar* pixel = img.ptr<uchar>(i);  // point to first color in row
+        for (int j = 0; j < img_w; ++j)
+        {
+            blob[data_idx+0*img_h*img_w] = static_cast<float>(*pixel++);
+            blob[data_idx+1*img_h*img_w] = static_cast<float>(*pixel++);
+            blob[data_idx+2*img_h*img_w] = static_cast<float>(*pixel++);
+            data_idx++;
+        }
+    }
+}
