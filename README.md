@@ -3,6 +3,7 @@
 - [ ] memory management
 - [ ] use cudnn
 - [ ] use engine files
+- [ ] use fixed size array instead of vector for pscore
 
 :trophy:News: **We won the VOT-18 real-time challenge**
 

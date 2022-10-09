@@ -35,6 +35,8 @@ private:
     const int instance_size = 271; // input x size (search region)
     const int total_stride = 8;
     const float scales = 8.0f;
+    const float min_h = 10.0f;
+    const float min_w = 10.0f;
 
     const int score_size = (instance_size-exemplar_size)/total_stride+1;
     const float context_amount = 0.5; // context amount for the exemplar

@@ -208,36 +208,20 @@ Rect2f DaSiam::update(const Mat &im)
     context_regress->enqueueV2(buffers_regress.data(), 0, nullptr);
     int delta_size = anchor.size()*4;
 
-
     cudaMemcpyAsync(delta, buffers_regress[1], delta_size*sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpyAsync(score, buffers_cls[1], 2*anchor.size()*sizeof(float), cudaMemcpyDeviceToHost);
     
     cudaStreamSynchronize(0);
 
-    int64 t2 = cv::getTickCount();
-    int64 tick_counter = t2 - t1;
+    // int64 t2 = cv::getTickCount();
+    // int64 tick_counter = t2 - t1;
     // cout << "FPS: " << ((double)(1.0f)) / (static_cast<double>(tick_counter) / cv::getTickFrequency()) << endl;
     // delta in shape of [4,1805]
     
-    pscore.clear();
+    pscore.clear(); // TODO:use fixed size array instead of vector
     penalty.clear();
     std::vector<float> temp_score;
-    std::vector<float> temp_score222(score,score+ 2*anchor.size() );
 
-
-    // cout<<std::max(temp_score222.begin(),temp_score222.end())<<endl;
-    // temp_score222.max
-    // auto max_pscore_it2 = std::max_element(temp_score222.begin(),temp_score222.end());
-    // int best_pscore_id2 = distance(temp_score222.begin(), temp_score222);
-
-    // cout<<"\n------------------------------------------------------\n";
-    // int i = 200;
-    // cout<<anchor.size()<<endl;
-    // cout<<delta[i + 0*anchor.size()]<<" ";
-    // cout<<delta[i + 1*anchor.size()]<<" ";
-    // cout<<delta[i + 2*anchor.size()]<<" ";
-    // cout<<delta[i + 3*anchor.size()]<<" ";
-    // cout<<endl;
     for(int i =0;i<anchor.size();i++)
     {
         std::vector<float> row = anchor.at(i);
@@ -245,10 +229,9 @@ Rect2f DaSiam::update(const Mat &im)
         delta[i + 1*anchor.size()] = delta[i + 1*anchor.size()] * static_cast<float>(row.at(3)) + static_cast<float>(row.at(1)); 
         delta[i + 2*anchor.size()] = std::exp(delta[i + 2*anchor.size()]) * static_cast<float>(row.at(2));
         delta[i + 3*anchor.size()] = std::exp(delta[i + 3*anchor.size()]) * static_cast<float>(row.at(3));
-        // softmmax!:
+        // softmax!:
         float score_ = std::exp(score[i+1*anchor.size()])/( std::exp(score[i+0*anchor.size()])+std::exp(score[i+1*anchor.size()]) );
-        // cout<<score_<<endl;
-        
+
         float s_c = change(
                     sz(delta[i + 2*anchor.size()],delta[i + 3*anchor.size()])/
                     sz(target_sz.width,target_sz.height)
@@ -264,97 +247,37 @@ Rect2f DaSiam::update(const Mat &im)
         pscore.push_back(pscore_);
         penalty.push_back(penalty_);
         temp_score.push_back(score_);
-        // if(i == 1262)
-        // {
-        //     cout<<"\n=====================================================\n";
-        //     cout<<"sz1 " <<sz(delta[i + 2*anchor.size()],delta[i + 3*anchor.size()])<<endl;
-        //     cout<<"sz2 "<<sz(target_sz.width,target_sz.height)<<endl;
-        //     cout<<"target_sz "<<target_sz<<endl;
-        //     cout<<delta[i + 2*anchor.size()]<<" " <<delta[i + 3*anchor.size()]<<endl;
-        //     cout<<"s_c "<< s_c<<endl;
-        //     cout<<"r_c "<<r_c <<endl;
-        //     cout<<"pscore_ "<< pscore_<<endl;
-        //     cout<<"penalty_ "<<penalty_ <<endl;
-        //     // cout<<""<< <<endl;
-        //     cout<<"\n=====================================================\n";
-        // }
     }
 
-    // cout<<window.size()<<endl;
-    // cout<<"\n------------------------------------------------------\n";
-    // for(int i =0;i<score_size;i++)
-    // {
-    //     for(int j =0;j<score_size;j++)
-    //         cout<<window.at<float>(i,j)<<"\t ";
-
-    //     cout<<"\n";
-    // }
-    // cout<<"\n------------------------------------------------------\n";
-    // int i = 200;
-    // cout<<temp_score[i]<<endl;
-
-    // / temp_score222.max
-    // auto max_pscore_it2 = std::max_element(temp_score.begin(),temp_score.end());
-    // int temp_score_id = distance(temp_score.begin(), max_pscore_it2);
-    // cout<<"max score: "<<temp_score[temp_score_id]<<endl;
-
-    // cout<<delta[i + 0*anchor.size()]<<" ";
-    // cout<<delta[i + 1*anchor.size()]<<" ";
-    // cout<<delta[i + 2*anchor.size()]<<" ";
-    // cout<<delta[i + 3*anchor.size()]<<" ";
-    // cout<<endl;
-
-    // cout<< anchor[i][0]<<" "<<anchor[i][1]<<" " <<anchor[i][2]<<" "<<anchor[i][3]<<endl;
-
-    // cout<<"\n------------------------------------------------------\n";
     auto max_pscore_it = std::max_element(pscore.begin(),pscore.end());
-    int best_pscore_id = distance(pscore.begin(), max_pscore_it);\
-    // cout<<"best_pscore_id "<<best_pscore_id<<endl;
-    // cout<<"max pscore: "<<pscore[best_pscore_id]<<endl;
-
+    int best_pscore_id = distance(pscore.begin(), max_pscore_it);
+    
     float res_x = delta[best_pscore_id + 0*anchor.size()]/scale_z;
     float res_y = delta[best_pscore_id + 1*anchor.size()]/scale_z;
     float res_w = delta[best_pscore_id + 2*anchor.size()]/scale_z;
     float res_h = delta[best_pscore_id + 3*anchor.size()]/scale_z;
-    // cout<<best_pscore_id<<endl;
-    // target_sz = Size2f(target_sz.width/scale_z,target_sz.height/scale_z);
 
     float lr = penalty[best_pscore_id]*temp_score[best_pscore_id]*p_lr;
-    // cout<<res_x<<", "<< res_y<<", "<<res_w<<", "<<res_h<<endl;
-    // cout<<"penalty[best_pscore_id] "<<penalty[best_pscore_id]<<endl;
-    // cout<<"temp_score[best_pscore_id] "<<temp_score[best_pscore_id]<<endl;
-
-    // cout<<"lr "<<lr<<endl;    
+  
     res_x = res_x + target_pos.x;
     res_y = res_y + target_pos.y;
     target_sz = target_sz / scale_z;
     res_w = target_sz.width*(1-lr)+res_w*lr;
     res_h = target_sz.height*(1-lr)+res_h*lr;
     // // TODO: store pscore
-    // Point2f new_target_pos;
-    // Size2f new_target_sz;
+    res_x = std::max(0.0f, std::min( (float)im_w, res_x));
+    res_y = std::max(0.0f, std::min( (float)im_h, res_y));
+    res_w = std::max(min_w, std::min( (float)im_w, res_w));
+    res_h = std::max(min_h, std::min( (float)im_h, res_h));
 
-    res_x = std::max(0.0f,std::min( (float)im_w,res_x));
-    res_y = std::max(0.0f,std::min( (float)im_h,res_y));
+    target_pos = Point2f(res_x,res_y);
+    target_sz = Size2f(res_w,res_h);
+    // end of def tracker_eval function
 
-    res_w = std::max( (float)10.0f,std::min((float)im_w,res_w));
-    res_h = std::max( (float)10.0f,std::min((float)im_h,res_h));
-    
-    Point2f new_target_pos = Point2f(res_x,res_y);
-    Size2f new_target_sz = Size2f(res_w,res_h);
-    // // end of def tracker_eval function
-    float x1 = new_target_pos.x-new_target_sz.width/2;
-    float y1 = new_target_pos.y-new_target_sz.height/2;  
-    Rect2f track_rect = Rect2f(x1,y1,new_target_sz.width,new_target_sz.height);
-    // cout<<track_rect.x<<",\t"<<track_rect.y<<",\t"<<track_rect.width<<",\t"<<track_rect.height<<"\n";
-    target_pos = new_target_pos;
-    target_sz = new_target_sz;
-
-
-    // cv::waitKey(0);
-    
-    return track_rect;//cv::Rect2f(target_pos.x,target_pos.y,target_sz.width,target_sz.height);
-    // return track_rect; //cv::Rect2f(res_w,res_y,res_h, res_h);
+    float x1 = target_pos.x-target_sz.width/2;
+    float y1 = target_pos.y-target_sz.height/2;  
+    Rect2f track_rect = Rect2f(x1, y1, target_sz.width, target_sz.height);
+    return track_rect;
 }
 
 float DaSiam::change(float r)
