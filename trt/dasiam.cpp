@@ -30,8 +30,8 @@ DaSiam::DaSiam()
     {
         auto binding_size = getSizeByDim(engine_temple->getBindingDimensions(i)) * 1 * sizeof(float);
         cudaMalloc(&buffers_temple[i], binding_size);
-        std::cout<<engine_temple->getBindingName(i)<<std::endl;
-        printDim(engine_temple->getBindingDimensions(i));
+        // std::cout<<engine_temple->getBindingName(i)<<std::endl;
+        // printDim(engine_temple->getBindingDimensions(i));
         if (engine_temple->bindingIsInput(i))
         {  
             input_dims_temple.emplace_back(engine_temple->getBindingDimensions(i));
@@ -48,8 +48,8 @@ DaSiam::DaSiam()
     {
         auto binding_size = getSizeByDim(engine_siam->getBindingDimensions(i)) * 1 * sizeof(float);
         cudaMalloc(&buffers_siam[i], binding_size);
-        std::cout<<engine_siam->getBindingName(i);
-        printDim(engine_siam->getBindingDimensions(i));
+        // std::cout<<engine_siam->getBindingName(i);
+        // printDim(engine_siam->getBindingDimensions(i));
         if (engine_siam->bindingIsInput(i))
         {  
             input_dims_siam.emplace_back(engine_siam->getBindingDimensions(i));
@@ -61,13 +61,13 @@ DaSiam::DaSiam()
     }
 
     buffers_regress.reserve(engine_regress->getNbBindings());
-    cout<<"------------------------------"<<endl;
+    // cout<<"------------------------------"<<endl;
     for (size_t i = 0; i < engine_regress->getNbBindings(); ++i)
     {
         auto binding_size = getSizeByDim(engine_regress->getBindingDimensions(i)) * 1 * sizeof(float);
         cudaMalloc(&buffers_regress[i], binding_size);
-        std::cout<<engine_regress->getBindingName(i);
-        printDim(engine_regress->getBindingDimensions(i));
+        // std::cout<<engine_regress->getBindingName(i);
+        // printDim(engine_regress->getBindingDimensions(i));
         if (engine_regress->bindingIsInput(i))
         {  
             input_dims_regress.emplace_back(engine_regress->getBindingDimensions(i));
@@ -79,17 +79,18 @@ DaSiam::DaSiam()
     }
 
     size_t binding_size;
-    buffers_r1.reserve(2);
-    binding_size = 256*22*22*sizeof(float);
-    cudaMalloc(&buffers_r1[0], binding_size);
-    binding_size = 20*19*19*sizeof(float);
-    cudaMalloc(&buffers_r1[1], binding_size);
+    // buffers_r1.reserve(2);
+    // binding_size = 256*22*22*sizeof(float);
+    // cudaMalloc(&buffers_r1[0], binding_size);
+    // binding_size = 20*19*19*sizeof(float);
+    // cudaMalloc(&buffers_r1[1], binding_size);
 
-    buffers_cls.reserve(2);
-    binding_size = 256*22*22*sizeof(float);
-    cudaMalloc(&buffers_cls[0], binding_size);
+    // // buffers_cls.reserve(2);
+    // // binding_size = 256*22*22*sizeof(float);
+    // cudaMalloc(&buffers_cls[0], binding_size);
+    // void * d_score;
     binding_size = 10*19*19*sizeof(float);
-    cudaMalloc(&buffers_cls[1], binding_size);
+    cudaMalloc(&d_score, binding_size);
 
     anchor = generate_anchor(total_stride,scales,ratios,score_size);
     window = get_hann_win(Size(score_size,score_size));
@@ -130,6 +131,25 @@ DaSiam::DaSiam()
 
     cudaMalloc(&cls1_d_workspace, cls1_workspace_bytes);
     cudaMalloc(&r1_d_workspace, r1_workspace_bytes);
+    // ----------------------------------------------------------------
+    // warm-up
+    for(int i=0;i<10;i++)
+    {
+        context_temple->enqueueV2(buffers_temple.data(), 0, nullptr);
+        context_siam->enqueueV2(buffers_siam.data(), 0, nullptr);
+        checkCUDNN(
+        cudnnConvolutionForward(cudnn, &cudnn_alpha, cls1_in_desc, buffers_siam[2], cls1_kernel_desc, buffers_temple[2],
+                            cls1_conv_desc, CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM, cls1_d_workspace, cls1_workspace_bytes, 
+                            &cudnn_beta, cls1_out_desc, d_score) ); // TODO change buffer buffers_cls[1]
+
+        checkCUDNN(
+        cudnnConvolutionForward(cudnn, &cudnn_alpha, r1_in_desc, buffers_siam[1], r1_kernel_desc, buffers_temple[1],
+                            r1_conv_desc, CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM, r1_d_workspace, r1_workspace_bytes, 
+                            &cudnn_beta, r1_out_desc, buffers_regress[0]) ); 
+        context_regress->enqueueV2(buffers_regress.data(), 0, nullptr);
+        cudaStreamSynchronize(0);
+    }
+    // 
 }
 
 DaSiam::~DaSiam()
@@ -139,14 +159,16 @@ DaSiam::~DaSiam()
     for (void * buf : buffers_siam)
         cudaFree(buf);
 
-    for (void * buf : buffers_r1)
-        cudaFree(buf);
+    // for (void * buf : buffers_r1)
+    //     cudaFree(buf);
     
-    for (void * buf : buffers_cls)
-        cudaFree(buf);
+    // for (void * buf : buffers_cls)
+    //     cudaFree(buf);
     for (void * buf : buffers_regress)
         cudaFree(buf);
 
+
+    cudaFree(d_score);
     delete[] score;
     delete[] delta;
     delete[] blob;
@@ -192,27 +214,27 @@ Rect2f DaSiam::update(const Mat &im)
     blobFromImage(x_crop,blob);
     cudaMemcpyAsync(buffers_siam[0], blob, 3 * instance_size * instance_size * sizeof(float), cudaMemcpyHostToDevice);
     context_siam->enqueueV2(buffers_siam.data(), 0, nullptr);
-    buffers_r1[0]  = buffers_siam[1]; // delta
-    buffers_cls[0] = buffers_siam[2]; // score
+    // buffers_r1[0]  = buffers_siam[1]; // delta
+    // buffers_cls[0] = buffers_siam[2]; // score
     // context_r1->enqueueV2(buffers_r1.data(), 0, nullptr);
     // context_cls->enqueueV2(buffers_cls.data(), 0, nullptr); // TODO do it with cuDNN
     // cudaStreamSynchronize(0);
     checkCUDNN(
     cudnnConvolutionForward(cudnn, &cudnn_alpha, cls1_in_desc, buffers_siam[2], cls1_kernel_desc, buffers_temple[2],
                             cls1_conv_desc, CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM, cls1_d_workspace, cls1_workspace_bytes, 
-                            &cudnn_beta, cls1_out_desc, buffers_cls[1]) ); // TODO change buffer buffers_cls[1]
+                            &cudnn_beta, cls1_out_desc, d_score) ); // TODO change buffer buffers_cls[1]
 
     checkCUDNN(
     cudnnConvolutionForward(cudnn, &cudnn_alpha, r1_in_desc, buffers_siam[1], r1_kernel_desc, buffers_temple[1],
                             r1_conv_desc, CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM, r1_d_workspace, r1_workspace_bytes, 
-                            &cudnn_beta, r1_out_desc, buffers_r1[1]) ); // TODO change buffer buffers_cls[1]
+                            &cudnn_beta, r1_out_desc, buffers_regress[0]) ); 
 
 
-    buffers_regress[0] = buffers_r1[1];
+    // buffers_regress[0] = buffers_r1[1];
     context_regress->enqueueV2(buffers_regress.data(), 0, nullptr);
     int delta_size = anchor.size()*4;
     cudaMemcpyAsync(delta, buffers_regress[1], delta_size*sizeof(float), cudaMemcpyDeviceToHost);
-    cudaMemcpyAsync(score, buffers_cls[1], 2*anchor.size()*sizeof(float), cudaMemcpyDeviceToHost);    
+    cudaMemcpyAsync(score, d_score, 2*anchor.size()*sizeof(float), cudaMemcpyDeviceToHost);    
     cudaStreamSynchronize(0);
 
     pscore.clear(); // TODO:use fixed size array instead of vector

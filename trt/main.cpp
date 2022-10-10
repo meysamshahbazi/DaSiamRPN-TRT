@@ -26,12 +26,15 @@ int main(int argc, const char ** argv)
     int frame_idx = 0;
     DaSiam ds;
     // return 0;
-  
+    frame_idx++;
+    int64 t1 = cv::getTickCount();
     ds.init(frame,roi);
-  
+    int64 t2 = cv::getTickCount();
+    tick_counter += t2 - t1;
     rectangle(frame, roi, Scalar( 255, 0, 0 ), 2, 1 );
+    cout << "FPSi: " << ((double)(frame_idx)) / (static_cast<double>(tick_counter) / cv::getTickFrequency()) << endl;
     imshow("tracker",frame);
-    // waitKey(0);
+    waitKey(1);
 
     for ( ;; )
     {

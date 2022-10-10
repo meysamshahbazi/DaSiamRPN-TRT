@@ -77,6 +77,8 @@ private:
     void* cls1_d_workspace{nullptr};
     void* r1_d_workspace{nullptr};
     const float cudnn_alpha = 1, cudnn_beta = 0;
+
+    void * d_score;
     // -------------------------------------------
     Point2f target_pos;
     Size2f target_sz;
