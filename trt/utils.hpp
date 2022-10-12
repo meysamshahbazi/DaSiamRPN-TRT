@@ -48,6 +48,8 @@ struct  TRTDestroy
     }                                                        \
   }
 
+void __add_da();
+
 void printDim(const nvinfer1::Dims& dims);
 
 void get_subwindow_tracking(const Mat &im, Point pos,int model_sz,int original_sz,Scalar avg_chans,Mat &z_crop);

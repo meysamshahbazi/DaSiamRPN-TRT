@@ -25,7 +25,7 @@ DaSiam::DaSiam()
 #endif    
 
     buffers_temple.reserve(engine_temple->getNbBindings());
-    cout<<"------------------------------"<<endl;
+    // cout<<"------------------------------"<<endl;
     for (size_t i = 0; i < engine_temple->getNbBindings(); ++i)
     {
         auto binding_size = getSizeByDim(engine_temple->getBindingDimensions(i)) * 1 * sizeof(float);
@@ -43,7 +43,7 @@ DaSiam::DaSiam()
     }
     
     buffers_siam.reserve(engine_siam->getNbBindings());
-    cout<<"------------------------------"<<endl;
+    // cout<<"------------------------------"<<endl;
     for (size_t i = 0; i < engine_siam->getNbBindings(); ++i)
     {
         auto binding_size = getSizeByDim(engine_siam->getBindingDimensions(i)) * 1 * sizeof(float);
@@ -122,6 +122,11 @@ DaSiam::DaSiam()
     cudaMalloc(&cls1_d_workspace, cls1_workspace_bytes);
     cudaMalloc(&r1_d_workspace, r1_workspace_bytes);
     // ----------------------------------------------------------------
+    // cuda thread stuff
+    cout<<"------------------------------"<<endl;
+    void __add_da();
+    cout<<"------------------------------"<<endl;
+    // ----------------------------------------------------------------
     // warm-up
     for(int i=0;i<10;i++)
     {
@@ -161,6 +166,7 @@ DaSiam::~DaSiam()
 
 void DaSiam::init(const Mat &im, const Rect2f state)
 {
+    __add_da();
     target_pos = (state.br()+state.tl())/2;
     target_sz = state.size();
     im_h = im.rows;
@@ -171,6 +177,7 @@ void DaSiam::init(const Mat &im, const Rect2f state)
     int s_z = std::round<int>(std::sqrt(wc_z*hc_z));
     Mat z_crop;
     get_subwindow_tracking(im,target_pos,exemplar_size,s_z,avg_chans,z_crop);
+    // cv::cvtColor(z_crop,z_crop,COLOR_YUV2BGR_I420);
     blobFromImage(z_crop,temple_blob);
     cudaMemcpyAsync(buffers_temple[0], temple_blob, 3 * exemplar_size * exemplar_size * sizeof(float), cudaMemcpyHostToDevice);
     context_temple->enqueueV2(buffers_temple.data(), 0, nullptr);
@@ -193,16 +200,13 @@ Rect2f DaSiam::update(const Mat &im)
     Mat x_crop;
     int64 t1 = cv::getTickCount();
     get_subwindow_tracking(im,target_pos,instance_size,s_x,avg_chans,x_crop);
-
+    // cv::cvtColor(x_crop,x_crop,COLOR_YUV2BGR_I420);
+    // // imshow("tracker",x_crop);
+    // // waitKey(0);
     target_sz = target_sz*scale_z;
     blobFromImage(x_crop,blob);
     cudaMemcpyAsync(buffers_siam[0], blob, 3 * instance_size * instance_size * sizeof(float), cudaMemcpyHostToDevice);
     context_siam->enqueueV2(buffers_siam.data(), 0, nullptr);
-    // buffers_r1[0]  = buffers_siam[1]; // delta
-    // buffers_cls[0] = buffers_siam[2]; // score
-    // context_r1->enqueueV2(buffers_r1.data(), 0, nullptr);
-    // context_cls->enqueueV2(buffers_cls.data(), 0, nullptr); // TODO do it with cuDNN
-    // cudaStreamSynchronize(0);
     checkCUDNN(
     cudnnConvolutionForward(cudnn, &cudnn_alpha, cls1_in_desc, buffers_siam[2], cls1_kernel_desc, buffers_temple[2],
                             cls1_conv_desc, CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM, cls1_d_workspace, cls1_workspace_bytes, 
@@ -220,6 +224,11 @@ Rect2f DaSiam::update(const Mat &im)
     cudaMemcpyAsync(delta, buffers_regress[1], delta_size*sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpyAsync(score, d_score, 2*anchor.size()*sizeof(float), cudaMemcpyDeviceToHost);    
     cudaStreamSynchronize(0);
+    
+    #define d_delta buffers_regress[1] // device pointer that represnt delta array
+
+
+
 
     pscore.clear(); // TODO:use fixed size array instead of vector
     penalty.clear();

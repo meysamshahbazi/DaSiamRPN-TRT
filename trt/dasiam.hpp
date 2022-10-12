@@ -25,6 +25,8 @@
 #include <opencv2/core/types.hpp>
 #include <cudnn.h>
 
+#include "d_utils.h"
+
 using namespace std;
 using namespace cv;
 

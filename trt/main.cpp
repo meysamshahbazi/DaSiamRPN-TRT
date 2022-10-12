@@ -2,6 +2,8 @@
 #include <iostream>
 #include "dasiam.hpp"
 
+#include "d_utils.h"
+
 using namespace std;
 using namespace cv;
 
@@ -32,6 +34,7 @@ int main(int argc, const char ** argv)
     int64 t2 = cv::getTickCount();
     tick_counter += t2 - t1;
     rectangle(frame, roi, Scalar( 255, 0, 0 ), 2, 1 );
+    
     cout << "FPSi: " << ((double)(frame_idx)) / (static_cast<double>(tick_counter) / cv::getTickFrequency()) << endl;
     imshow("tracker",frame);
     waitKey(1);
@@ -40,6 +43,9 @@ int main(int argc, const char ** argv)
     {
         // get frame from the video
         cap >> frame;
+        // cv::Mat temp;
+        
+        // cv::cvtColor(frame,temp,COLOR_BGR2YUV_I420);
         // stop the program if no more images
         if(frame.rows==0 || frame.cols==0)
             break;
