@@ -17,6 +17,7 @@ set(CUDA_NVCC_FLAGS
     ${CUDA_NVCC_FLAGS};
     -O3 -gencode arch=compute_86,code=sm_86)
 
+
 SET(GCC_COVERAGE_COMPILE_FLAGS "-std=c++14 -Wunused-function")
 SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${GCC_COVERAGE_COMPILE_FLAGS}" )
 
@@ -25,6 +26,8 @@ find_package(OpenCV REQUIRED)
 find_package(TensorRT REQUIRED)
 
 # TARGETS --------------------------------------------------------------------------------------------------------------
+
 add_executable(${PROJECT_NAME} main.cpp dasiam.cpp utils.cpp)
+set_target_properties(${PROJECT_NAME} PROPERTIES CUDA_ARCHITECTURES "86")
 target_include_directories(${PROJECT_NAME} PUBLIC ${CUDNN_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS} ${TensorRT_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PUBLIC ${CUDNN_LIBRARIES}  ${OpenCV_LIBS} ${CUDA_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${TensorRT_LIBRARIES})

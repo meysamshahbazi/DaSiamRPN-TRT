@@ -1,10 +1,11 @@
 ## TODO:
-- [ ] solve F.conv of last ...
+- [X] solve F.conv of last ...
 - [ ] memory management
-- [ ] use cudnn
+- [X] use cudnn
 - [X] use engine files
 - [ ] use fixed size array instead of vector for pscore
-
+- [ ] use cublas ...
+- [ ] remove jupyter files ...
 :trophy:News: **We won the VOT-18 real-time challenge**
 
 :trophy:News: **We won the second place in the VOT-18 long-term challenge**

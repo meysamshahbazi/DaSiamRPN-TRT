@@ -66,8 +66,6 @@ DaSiam::DaSiam()
     {
         auto binding_size = getSizeByDim(engine_regress->getBindingDimensions(i)) * 1 * sizeof(float);
         cudaMalloc(&buffers_regress[i], binding_size);
-        // std::cout<<engine_regress->getBindingName(i);
-        // printDim(engine_regress->getBindingDimensions(i));
         if (engine_regress->bindingIsInput(i))
         {  
             input_dims_regress.emplace_back(engine_regress->getBindingDimensions(i));
@@ -79,16 +77,6 @@ DaSiam::DaSiam()
     }
 
     size_t binding_size;
-    // buffers_r1.reserve(2);
-    // binding_size = 256*22*22*sizeof(float);
-    // cudaMalloc(&buffers_r1[0], binding_size);
-    // binding_size = 20*19*19*sizeof(float);
-    // cudaMalloc(&buffers_r1[1], binding_size);
-
-    // // buffers_cls.reserve(2);
-    // // binding_size = 256*22*22*sizeof(float);
-    // cudaMalloc(&buffers_cls[0], binding_size);
-    // void * d_score;
     binding_size = 10*19*19*sizeof(float);
     cudaMalloc(&d_score, binding_size);
 
@@ -123,11 +111,13 @@ DaSiam::DaSiam()
                                             /*mode=*/CUDNN_CROSS_CORRELATION, // TODO: it may need change ... 
                                             /*computeType=*/CUDNN_DATA_FLOAT));
 
-    cudnnGetConvolutionForwardWorkspaceSize(cudnn, cls1_in_desc,cls1_kernel_desc,cls1_conv_desc,cls1_out_desc,CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM,
-                                        &cls1_workspace_bytes);
+    cudnnGetConvolutionForwardWorkspaceSize(cudnn, cls1_in_desc,cls1_kernel_desc,cls1_conv_desc,
+                                            cls1_out_desc,CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM,
+                                            &cls1_workspace_bytes);
 
-    cudnnGetConvolutionForwardWorkspaceSize(cudnn, r1_in_desc,r1_kernel_desc,r1_conv_desc,r1_out_desc,CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM,
-                                        &r1_workspace_bytes);
+    cudnnGetConvolutionForwardWorkspaceSize(cudnn, r1_in_desc, r1_kernel_desc, r1_conv_desc,
+                                            r1_out_desc,CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_PRECOMP_GEMM,
+                                            &r1_workspace_bytes);
 
     cudaMalloc(&cls1_d_workspace, cls1_workspace_bytes);
     cudaMalloc(&r1_d_workspace, r1_workspace_bytes);
@@ -149,7 +139,7 @@ DaSiam::DaSiam()
         context_regress->enqueueV2(buffers_regress.data(), 0, nullptr);
         cudaStreamSynchronize(0);
     }
-    // 
+    
 }
 
 DaSiam::~DaSiam()
@@ -159,14 +149,8 @@ DaSiam::~DaSiam()
     for (void * buf : buffers_siam)
         cudaFree(buf);
 
-    // for (void * buf : buffers_r1)
-    //     cudaFree(buf);
-    
-    // for (void * buf : buffers_cls)
-    //     cudaFree(buf);
     for (void * buf : buffers_regress)
         cudaFree(buf);
-
 
     cudaFree(d_score);
     delete[] score;

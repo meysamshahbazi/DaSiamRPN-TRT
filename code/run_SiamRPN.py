@@ -66,35 +66,21 @@ class TrackerConfig(object):
 
 
 def tracker_eval(net, x_crop, target_pos, target_sz, window, scale_z, p):
-    # print(x_crop)
-    # x_crop = torch.ones_like(x_crop)
+
     delta, score, delta_,score_ = net(x_crop)
 
-    # for i in range(10):
-    #     print(score_[0,i,0,0])
 
-    
     # delta = delta.permute(1, 2, 3, 0).contiguous().view(4, -1).data.cpu().numpy()
     delta = delta.view(4, -1).data.cpu().numpy()
     # score = F.softmax(score.permute(1, 2, 3, 0).contiguous().view(2, -1), dim=0).data[1, :].cpu().numpy()
     score = F.softmax(score.view(2, -1), dim=0).data[1, :].cpu().numpy()
 
-    # print(score[200])
-    # for i in score:
-    #     print(i)
     
-    # print(score.shape)
-    # # print(delta)
-    # for i in range(4):
-    #     print(delta[i,0])
-    # print("max :",score.max())
     delta[0, :] = delta[0, :] * p.anchor[:, 2] + p.anchor[:, 0]
     delta[1, :] = delta[1, :] * p.anchor[:, 3] + p.anchor[:, 1]
     delta[2, :] = np.exp(delta[2, :]) * p.anchor[:, 2]
     delta[3, :] = np.exp(delta[3, :]) * p.anchor[:, 3]
-    # print(delta[:,200])
-    # print(p.anchor[200,:])
-    # print( p.anchor[200, 3] ," ", p.anchor[200, 1])
+
     def change(r):
         return np.maximum(r, 1./r)
 
@@ -116,29 +102,14 @@ def tracker_eval(net, x_crop, target_pos, target_sz, window, scale_z, p):
     pscore = penalty * score
     
     # window float
-    print(window.shape)
 
     pscore = pscore * (1 - p.window_influence) + window * p.window_influence
     best_pscore_id = np.argmax(pscore)
-    print("=====================================================")
-    print(sz(delta[2, best_pscore_id], delta[3, best_pscore_id]))
-    print(sz_wh(target_sz))
-    print("target_sz ",target_sz)
-    print(delta[2, best_pscore_id]," ", delta[3, best_pscore_id])
-    print("s_c ",s_c[best_pscore_id])
-    print("r_c ",r_c[best_pscore_id])
-    print("pscore ",pscore[best_pscore_id])
-    print("penalty ",penalty[best_pscore_id])
-    print("=====================================================")
-    print(best_pscore_id)
-    print("m ax pscore",pscore.max())
+   
     target = delta[:, best_pscore_id] / scale_z
     target_sz = target_sz / scale_z
     lr = penalty[best_pscore_id] * score[best_pscore_id] * p.lr
-    # print(target)
-    print("penalty[best_pscore_id]  ",penalty[best_pscore_id] )
-    print("score[best_pscore_id] ",score[best_pscore_id])
-    print("lr ",lr)
+
     res_x = target[0] + target_pos[0]
     res_y = target[1] + target_pos[1]
 
