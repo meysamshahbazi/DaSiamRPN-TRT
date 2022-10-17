@@ -43,10 +43,7 @@ int main(int argc, const char ** argv)
     {
         // get frame from the video
         cap >> frame;
-        // cv::Mat temp;
-        
-        // cv::cvtColor(frame,temp,COLOR_BGR2YUV_I420);
-        // stop the program if no more images
+
         if(frame.rows==0 || frame.cols==0)
             break;
         frame_idx ++;
