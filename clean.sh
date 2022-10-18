@@ -9,3 +9,6 @@ rm LICENSE
 rm votresult.png 
 rm Untitled.ipynb 
 rm -rf trt/build/
+rm -rf .vscode
+rm .gitignore
+rm run_install.sh 

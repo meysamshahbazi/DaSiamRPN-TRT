@@ -80,7 +80,10 @@ private:
     void* r1_d_workspace{nullptr};
     const float cudnn_alpha = 1, cudnn_beta = 0;
 
-    void * d_score;
+    float * d_score;
+    float *d_anchor;
+    float *d_window;
+    // float *h_anchor;
     // -------------------------------------------
     Point2f target_pos;
     Size2f target_sz;

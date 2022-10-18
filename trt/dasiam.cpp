@@ -81,7 +81,37 @@ DaSiam::DaSiam()
     cudaMalloc(&d_score, binding_size);
 
     anchor = generate_anchor(total_stride,scales,ratios,score_size);
+    float * h_anchor = new float[anchor.size()*4];
+
+    // float* d_anchor;
+    cudaMalloc(&d_anchor, anchor.size()*4*sizeof(float));
+
+    for (int j=0; j<4; j++)
+    {
+        for(int i=0; i<anchor.size(); i++)
+            h_anchor[j*anchor.size()+i] = anchor[i][j];
+    }
+
+    cudaMemcpy(d_anchor,h_anchor,anchor.size()*4*sizeof(float),cudaMemcpyHostToDevice);
     window = get_hann_win(Size(score_size,score_size));
+
+    // window.at<float>(index_window/score_size,index_window%score_size)
+    cout<<"anchor.size() "<<anchor.size()<<endl;
+    float* h_window = new float[anchor.size()];
+
+    int window_idx = 0;
+    for(int i = 0;i<5;i++)
+        for(int j = 0;j<score_size;j++)
+            for(int k = 0;k<score_size;k++)
+            {
+                h_window[window_idx] = window.at<float>(j,k);
+                window_idx++;
+            }
+
+    cudaMalloc(&d_window, anchor.size()*sizeof(float));
+    cudaMemcpy(d_window,h_window,anchor.size()*sizeof(float),cudaMemcpyHostToDevice);
+
+
     delta = new float[4*anchor.size()];
     score = new float[2*anchor.size()];
     blob = new float[3*instance_size*instance_size];
@@ -166,7 +196,7 @@ DaSiam::~DaSiam()
 
 void DaSiam::init(const Mat &im, const Rect2f state)
 {
-    __add_da();
+    // __add_da();
     target_pos = (state.br()+state.tl())/2;
     target_sz = state.size();
     im_h = im.rows;
@@ -220,20 +250,26 @@ Rect2f DaSiam::update(const Mat &im)
 
     // buffers_regress[0] = buffers_r1[1];
     context_regress->enqueueV2(buffers_regress.data(), 0, nullptr);
+    
+    #define d_delta buffers_regress[1] // device pointer that represnts delta array
     int delta_size = anchor.size()*4;
+    
+
+    
+    
+    
+    //----------------------------------------------------------
+    // #define CPU_POST_PROCESS
+
+
+    #ifdef CPU_POST_PROCESS
+
     cudaMemcpyAsync(delta, buffers_regress[1], delta_size*sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpyAsync(score, d_score, 2*anchor.size()*sizeof(float), cudaMemcpyDeviceToHost);    
     cudaStreamSynchronize(0);
-    
-    #define d_delta buffers_regress[1] // device pointer that represnt delta array
-
-
-
-
     pscore.clear(); // TODO:use fixed size array instead of vector
     penalty.clear();
     std::vector<float> temp_score;
-
     for(int i =0;i<anchor.size();i++)
     {
         std::vector<float> row = anchor.at(i);
@@ -245,8 +281,8 @@ Rect2f DaSiam::update(const Mat &im)
         float score_ = std::exp(score[i+1*anchor.size()])/( std::exp(score[i+0*anchor.size()])+std::exp(score[i+1*anchor.size()]) );
 
         float s_c = change(
-                    sz(delta[i + 2*anchor.size()],delta[i + 3*anchor.size()])/
-                    sz(target_sz.width,target_sz.height)
+                    sz(delta[i + 2*anchor.size()], delta[i + 3*anchor.size()])/
+                    sz(target_sz.width, target_sz.height)
         );
 
         float r_c = change( (target_sz.width/target_sz.height) /
@@ -268,8 +304,28 @@ Rect2f DaSiam::update(const Mat &im)
     float res_y = delta[best_pscore_id + 1*anchor.size()]/scale_z;
     float res_w = delta[best_pscore_id + 2*anchor.size()]/scale_z;
     float res_h = delta[best_pscore_id + 3*anchor.size()]/scale_z;
-
     float lr = penalty[best_pscore_id]*temp_score[best_pscore_id]*p_lr;
+    #endif
+
+    //---------------------------------------------------------------------------------------------------
+
+    #define GPU_POST_PROCESS
+    
+    #ifdef GPU_POST_PROCESS
+
+    float * ret = new float[6];
+    cudaStreamSynchronize(0);
+    foo(static_cast<float*>(d_delta),d_anchor, d_score,d_window,
+        window_influence,target_sz.width,target_sz.height,penalty_k,anchor.size(),
+        ret,0);
+    
+    float res_x = ret[0]/scale_z;
+    float res_y = ret[1]/scale_z;
+    float res_w = ret[2]/scale_z;
+    float res_h = ret[3]/scale_z;
+    float lr = ret[4]*ret[5]*p_lr;
+    #endif
+
   
     res_x = res_x + target_pos.x;
     res_y = res_y + target_pos.y;
