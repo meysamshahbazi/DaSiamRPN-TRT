@@ -314,8 +314,8 @@ Rect2f DaSiam::update(const Mat &im)
     #ifdef GPU_POST_PROCESS
 
     float * ret = new float[6];
-    cudaStreamSynchronize(0);
-    foo(static_cast<float*>(d_delta),d_anchor, d_score,d_window,
+    // cudaStreamSynchronize(0);
+    post_process(static_cast<float*>(d_delta),d_anchor, d_score,d_window,
         window_influence,target_sz.width,target_sz.height,penalty_k,anchor.size(),
         ret,0);
     

@@ -87,8 +87,7 @@ struct window_functor
 };
 
 
-// TODO: make d_window as same soze of row_size by repeation!
-void post_process( float* d_delta,float* d_ancher, float* d_score,float* d_window,
+void post_process_old( float* d_delta,float* d_ancher, float* d_score,float* d_window,
           float window_influence,float w,float h, float penalty_k,int row_size,
           float* ret,cudaStream_t stream)
 {
@@ -96,6 +95,8 @@ void post_process( float* d_delta,float* d_ancher, float* d_score,float* d_windo
   // 0 for x, 1 for y, 2 for w and 3 for h 
   // i used 0,1,2,3 instead of x,y,w,h in order of match the code with cpp and python 
   // TODO: avoid creating these vector and use ::begin(d_ancher) directrly
+
+  
   thrust::device_vector<float> delta_0(d_delta + 0*row_size, d_delta + 1*row_size);
   thrust::device_vector<float> ancher_0(d_ancher + 0*row_size, d_ancher + 1*row_size);
 
@@ -125,11 +126,18 @@ void post_process( float* d_delta,float* d_ancher, float* d_score,float* d_windo
                           _1*_2);
 
 
-  // thrust::transform(      delta_0.begin(), delta_0.end(),  // input range #1
-  //                         ancher_2.begin(),           // input range #2
-  //                         delta_0.begin(),           // output range
-  //                         _1*_2);
 
+
+
+    // use thrust::device_ptr
+
+    // thrust::device_ptr<float> delta_0_begin (d_delta);
+
+    // thrust::transform(
+    //                       delta_0_begin,delta_0_begin+row_size,  // input range #1
+    //                       ancher_2.begin(),           // input range #2
+    //                       delta_0_begin,           // output range
+    //                       _1*_2);                          
 
 
                          
@@ -231,7 +239,7 @@ void post_process( float* d_delta,float* d_ancher, float* d_score,float* d_windo
   // float* ret = new float[6];
   // cudaMemcpy()
 
-  std::cout<<"im hereeeeeeeeee-FOO "<<best_pscore_id<<"\n";
+  // std::cout<<"im hereeeeeeeeee-FOO "<<best_pscore_id<<"\n";
   // d_ret[0] = delta_0[best_pscore_id];
   // d_ret[1] = delta_1[best_pscore_id];
   // d_ret[2] = delta_2[best_pscore_id];  
@@ -254,7 +262,121 @@ void post_process( float* d_delta,float* d_ancher, float* d_score,float* d_windo
   // ret[3] = h_ret[3];
   // ret[4] = h_ret[4];
   // ret[5] = h_ret[5];
-  cudaMemcpy(ret,h_ret.data() ,6*sizeof(float),cudaMemcpyDeviceToHost);
+  // cudaMemcpy(ret,h_ret.data() ,6*sizeof(float),cudaMemcpyDeviceToHost);
+
+}
+
+// TODO: make d_window as same soze of row_size by repeation!
+void post_process( float* d_delta,float* d_anchor, float* d_score,float* d_window,
+          float window_influence,float w,float h, float penalty_k,int row_size,
+          float* ret,cudaStream_t stream)
+{
+  // in this function I omit device_vector and use device_ptr
+  // _index represents [i+index*anchor.size()]
+  // 0 for x, 1 for y, 2 for w and 3 for h 
+  // i used 0,1,2,3 instead of x,y,w,h in order of match the code with cpp and python 
+  // TODO: avoid creating these vector and use ::begin(d_ancher) directrly
+
+  thrust::device_ptr<float> delta_0_begin(d_delta);
+  thrust::device_ptr<float> anchor_0_begin(d_anchor);
+
+  thrust::device_ptr<float> delta_1_begin(delta_0_begin+1*row_size);
+  thrust::device_ptr<float> anchor_1_begin(anchor_0_begin+1*row_size);
+
+  thrust::device_ptr<float> delta_2_begin(delta_0_begin+2*row_size);
+  thrust::device_ptr<float> anchor_2_begin(anchor_0_begin+2*row_size);
+
+  thrust::device_ptr<float> delta_3_begin(delta_0_begin+3*row_size);
+  thrust::device_ptr<float> anchor_3_begin(anchor_0_begin+3*row_size);
+
+  thrust::device_ptr<float> score_0_begin(d_score);
+  thrust::device_ptr<float> score_1_begin(d_score+row_size);
+
+  thrust::device_vector<float> penalty(row_size);
+  thrust::device_vector<float> pscore(row_size);
+  
+  thrust::device_ptr<float> window_begin(d_window);
+
+  thrust::transform(
+                          delta_0_begin, delta_0_begin+row_size,  // input range #1
+                          anchor_2_begin,           // input range #2
+                          delta_0_begin,           // output range
+                          _1*_2);            
+
+  thrust::transform(   
+                          delta_0_begin, delta_0_begin+row_size,  // input range #1
+                          anchor_0_begin,           // input range #2
+                          delta_0_begin,           // output range
+                          _1+_2);   // functor
+  
+  thrust::transform(   
+                          delta_1_begin, delta_1_begin+row_size,  // input range #1
+                          anchor_3_begin,           // input range #2
+                          delta_1_begin,           // output range
+                          _1*_2);
+                          // thrust::multiplies<float>());   // functor
+
+                  
+  thrust::transform(      
+                          delta_1_begin, delta_1_begin+row_size,   // input range #1
+                          anchor_1_begin,                 // input range #2
+                          delta_1_begin,                 // output range
+                          _1+_2);
+                          // thrust::plus<float>());   // functor
+  
+  thrust::transform(       
+                      delta_2_begin, delta_2_begin+row_size,
+                      anchor_2_begin,
+                      delta_2_begin,
+                      eda_functor()
+  );
+  
+  thrust::transform(   
+                      delta_3_begin, delta_3_begin+row_size,
+                      anchor_3_begin,
+                      delta_3_begin,
+                      eda_functor()
+  );
+  
+  // do softmax 
+  thrust::transform(        
+                      score_1_begin, score_0_begin+row_size,
+                      score_0_begin,
+                      score_1_begin,
+                      softmax_functor()
+  );
+
+  thrust::transform(  
+                      delta_2_begin,delta_2_begin+row_size,  // input range #1
+                      delta_3_begin,                // input range #2
+                      penalty.begin(),                // output range
+                      penalty_functor(w,h,penalty_k)  // functor
+  );
+  
+  thrust::transform(   
+                      penalty.begin(),penalty.end(),  // input range #1
+                      score_1_begin,                // input range #2
+                      pscore.begin(),                 // output range
+                      thrust::multiplies<float>()     // functor
+  );
+  
+  thrust::transform(   
+                      pscore.begin(), pscore.end(),     // input range #1
+                      window_begin,                   // input range #2
+                      pscore.begin(),
+                      (1-window_influence)*_1+window_influence*_2
+                      // window_functor(window_influence)
+  ); 
+
+  auto max_pscore_it = thrust::max_element(pscore.begin(),pscore.end());
+  int best_pscore_id = thrust::distance(pscore.begin(), max_pscore_it);
+
+  ret[0] = *(delta_0_begin+best_pscore_id);
+  ret[1] = *(delta_1_begin+best_pscore_id);
+  ret[2] = *(delta_2_begin+best_pscore_id);
+  ret[3] = *(delta_3_begin+best_pscore_id);
+  ret[4] = penalty[best_pscore_id];
+  ret[5] = pscore[best_pscore_id];
 
 }
 
