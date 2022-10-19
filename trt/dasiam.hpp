@@ -30,6 +30,10 @@
 using namespace std;
 using namespace cv;
 
+// #define CLASSIC_MEM_
+#define UNIFIED_MEM_
+
+
 class DaSiam
 {
 private:

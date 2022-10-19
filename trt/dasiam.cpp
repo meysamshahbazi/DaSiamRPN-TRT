@@ -29,7 +29,7 @@ DaSiam::DaSiam()
     for (size_t i = 0; i < engine_temple->getNbBindings(); ++i)
     {
         auto binding_size = getSizeByDim(engine_temple->getBindingDimensions(i)) * 1 * sizeof(float);
-        cudaMalloc(&buffers_temple[i], binding_size);
+        
         // std::cout<<engine_temple->getBindingName(i)<<std::endl;
         // printDim(engine_temple->getBindingDimensions(i));
         if (engine_temple->bindingIsInput(i))
@@ -38,6 +38,7 @@ DaSiam::DaSiam()
         }
         else
         {
+            cudaMalloc(&buffers_temple[i], binding_size);
             output_dims_temple.emplace_back(engine_temple->getBindingDimensions(i));
         }
     }
@@ -47,7 +48,7 @@ DaSiam::DaSiam()
     for (size_t i = 0; i < engine_siam->getNbBindings(); ++i)
     {
         auto binding_size = getSizeByDim(engine_siam->getBindingDimensions(i)) * 1 * sizeof(float);
-        cudaMalloc(&buffers_siam[i], binding_size);
+        
         // std::cout<<engine_siam->getBindingName(i);
         // printDim(engine_siam->getBindingDimensions(i));
         if (engine_siam->bindingIsInput(i))
@@ -56,6 +57,7 @@ DaSiam::DaSiam()
         }
         else
         {
+            cudaMalloc(&buffers_siam[i], binding_size);
             output_dims_siam.emplace_back(engine_siam->getBindingDimensions(i));
         }
     }
@@ -112,10 +114,26 @@ DaSiam::DaSiam()
     cudaMemcpy(d_window,h_window,anchor.size()*sizeof(float),cudaMemcpyHostToDevice);
 
 
+#ifdef CLASSIC_MEM_
+
     delta = new float[4*anchor.size()];
     score = new float[2*anchor.size()];
     blob = new float[3*instance_size*instance_size];
     temple_blob = new float[3*exemplar_size*exemplar_size];
+    cudaMalloc(&buffers_siam[0], 3*instance_size*instance_size*sizeof(float));
+    cudaMalloc(&buffers_temple[0], 3*exemplar_size*exemplar_size*sizeof(float));
+#endif
+
+#ifdef UNIFIED_MEM_
+
+    cudaMallocManaged((void **)&blob,3*instance_size*instance_size*sizeof(float),cudaMemAttachHost);
+    cudaMallocManaged((void **)&temple_blob,3*exemplar_size*exemplar_size*sizeof(float),cudaMemAttachHost);
+    buffers_siam[0] = (void *) blob;
+    buffers_temple[0] = (void *) temple_blob;
+
+#endif
+
+
     // CUDNN stuff 
     checkCUDNN(cudnnCreate(&cudnn));
     checkCUDNN(cudnnCreateTensorDescriptor(&cls1_in_desc));
@@ -151,11 +169,7 @@ DaSiam::DaSiam()
 
     cudaMalloc(&cls1_d_workspace, cls1_workspace_bytes);
     cudaMalloc(&r1_d_workspace, r1_workspace_bytes);
-    // ----------------------------------------------------------------
-    // cuda thread stuff
-    cout<<"------------------------------"<<endl;
-    void __add_da();
-    cout<<"------------------------------"<<endl;
+
     // ----------------------------------------------------------------
     // warm-up
     for(int i=0;i<10;i++)
@@ -209,7 +223,12 @@ void DaSiam::init(const Mat &im, const Rect2f state)
     get_subwindow_tracking(im,target_pos,exemplar_size,s_z,avg_chans,z_crop);
     // cv::cvtColor(z_crop,z_crop,COLOR_YUV2BGR_I420);
     blobFromImage(z_crop,temple_blob);
+#ifdef CLASSIC_MEM_
     cudaMemcpyAsync(buffers_temple[0], temple_blob, 3 * exemplar_size * exemplar_size * sizeof(float), cudaMemcpyHostToDevice);
+#endif
+#ifdef UNIFIED_MEM_
+    cudaStreamAttachMemAsync(0,temple_blob,0,cudaMemAttachGlobal);
+#endif
     context_temple->enqueueV2(buffers_temple.data(), 0, nullptr);
     // cudaStreamSynchronize(0); // this is vital to wait for last results ..
     // create_fconv_r(engine_r1,context_r1);
@@ -235,7 +254,13 @@ Rect2f DaSiam::update(const Mat &im)
     // // waitKey(0);
     target_sz = target_sz*scale_z;
     blobFromImage(x_crop,blob);
+#ifdef CLASSIC_MEM_
     cudaMemcpyAsync(buffers_siam[0], blob, 3 * instance_size * instance_size * sizeof(float), cudaMemcpyHostToDevice);
+#endif
+#ifdef UNIFIED_MEM_
+    cudaStreamAttachMemAsync(0,blob,0,cudaMemAttachGlobal);
+#endif
+
     context_siam->enqueueV2(buffers_siam.data(), 0, nullptr);
     checkCUDNN(
     cudnnConvolutionForward(cudnn, &cudnn_alpha, cls1_in_desc, buffers_siam[2], cls1_kernel_desc, buffers_temple[2],
