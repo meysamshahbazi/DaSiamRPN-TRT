@@ -1,6 +1,6 @@
 ## TODO:
 - [X] solve F.conv of last ...
-- [ ] memory management
+- [X] memory management
 - [X] use cudnn
 - [X] use engine files
 - [X] use thrust for post processes
