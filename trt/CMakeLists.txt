@@ -19,6 +19,7 @@ set(CUDA_HOST_COMPILER /usr/bin/g++)
 set(CUDA_NVCC_FLAGS
     ${CUDA_NVCC_FLAGS};
     -O3 -gencode arch=compute_86,code=sm_86)
+    # -O3 -gencode arch=compute_62,code=sm_62) for tegra
 
 
 SET(GCC_COVERAGE_COMPILE_FLAGS "-std=c++14 -Wunused-function")

@@ -44,7 +44,7 @@ void __add_da();
 /// @param penalty_k 
 /// @param row_size 
 /// @param ret host pointer with size 6 that contains res_x,res_y,res_w,res_h,penalty,score 
-void foo( float* d_delta,float* d_ancher, float* d_score,float* d_window,
+void post_process( float* d_delta,float* d_ancher, float* d_score,float* d_window,
           float window_influence,float w,float h, float penalty_k,int row_size,
           float* ret,cudaStream_t stream);
 

@@ -88,7 +88,7 @@ struct window_functor
 
 
 // TODO: make d_window as same soze of row_size by repeation!
-void foo( float* d_delta,float* d_ancher, float* d_score,float* d_window,
+void post_process( float* d_delta,float* d_ancher, float* d_score,float* d_window,
           float window_influence,float w,float h, float penalty_k,int row_size,
           float* ret,cudaStream_t stream)
 {
@@ -212,7 +212,7 @@ void foo( float* d_delta,float* d_ancher, float* d_score,float* d_window,
                       (1-window_influence)*_1+window_influence*_2
                       // window_functor(window_influence)
   ); 
-
+  
   
 
   auto max_pscore_it = thrust::max_element(pscore.begin(),pscore.end());

@@ -3,6 +3,7 @@
 - [ ] memory management
 - [X] use cudnn
 - [X] use engine files
+- [X] use thrust for post processes
 - [ ] use fixed size array instead of vector for pscore
 - [ ] use cublas ...
 - [ ] remove jupyter files ...
